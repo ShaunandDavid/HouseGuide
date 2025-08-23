@@ -7,6 +7,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import VerifyEmail from "@/pages/VerifyEmail";
+import OnboardResident from "@/pages/OnboardResident";
 import House from "@/pages/House";
 import Resident from "@/pages/Resident";
 import TrackerDashboard from "@/pages/TrackerDashboard";
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/house/:houseId" component={House} />
+      <Route path="/house/:houseId/onboard" component={OnboardResident} />
       <Route path="/resident/:id" component={Resident} />
       <Route path="/resident/:id/trackers" component={TrackerDashboard} />
       <Route path="/resident/:id/goals" component={GoalTracker} />

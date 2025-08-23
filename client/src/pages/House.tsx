@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Home, User, ChevronRight, Settings } from "lucide-react";
+import { Home, User, ChevronRight, Settings, UserPlus } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { House, Resident, FileRecord } from "@shared/schema";
@@ -127,17 +127,31 @@ export default function House() {
 
       {/* Main Content */}
       <main className="flex-1 p-4">
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Residents</h3>
-          <p className="text-gray-600">Manage resident files and weekly reports</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Residents</h3>
+            <p className="text-gray-600">Manage resident files and weekly reports</p>
+          </div>
+          <Link href={`/house/${houseId}/onboard`}>
+            <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-resident">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add New Resident
+            </Button>
+          </Link>
         </div>
 
         {residents.length === 0 ? (
           <Card data-testid="no-residents">
             <CardContent className="pt-6 text-center">
               <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Residents</h4>
-              <p className="text-gray-600">No residents have been added to this house yet.</p>
+              <h4 className="text-lg font-medium text-gray-900 mb-2">No Residents Added Yet</h4>
+              <p className="text-gray-600 mb-4">Start by adding your first resident to the facility.</p>
+              <Link href={`/house/${houseId}/onboard`}>
+                <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-first-resident">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add Your First Resident
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         ) : (
