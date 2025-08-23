@@ -271,9 +271,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/residents", async (req, res) => {
+  app.post("/api/residents", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertResidentSchema.parse(req.body);
+      
+      // Ensure resident is assigned to the guide's house (security)
+      validatedData.house = req.guide.houseId!;
+      
       const resident = await storage.createResident(validatedData);
       res.status(201).json(resident);
     } catch (error) {
@@ -284,7 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/residents/:id", async (req, res) => {
+  app.patch("/api/residents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertResidentSchema.partial().parse(req.body);
@@ -298,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/residents/:id", async (req, res) => {
+  app.delete("/api/residents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteResident(id);
@@ -312,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Files endpoints
-  app.post("/api/files", async (req, res) => {
+  app.post("/api/files", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertFileSchema.parse(req.body);
       const file = await storage.createFile(validatedData);
@@ -325,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/files/by-resident/:residentId", async (req, res) => {
+  app.get("/api/files/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const files = await storage.getFilesByResident(residentId);
@@ -338,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/files/:id", async (req, res) => {
+  app.delete("/api/files/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteFile(id);
@@ -352,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reports endpoints
-  app.post("/api/reports", async (req, res) => {
+  app.post("/api/reports", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertReportSchema.parse(req.body);
       
@@ -378,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reports/:residentId/:weekStart", async (req, res) => {
+  app.get("/api/reports/:residentId/:weekStart", requireAuth, async (req: any, res) => {
     try {
       const { residentId, weekStart } = req.params;
       const report = await storage.getReportByResidentAndWeek(residentId, weekStart);
@@ -392,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Goals endpoints
-  app.get("/api/goals/by-resident/:residentId", async (req, res) => {
+  app.get("/api/goals/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const goals = await storage.getGoalsByResident(residentId);
@@ -403,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/goals", async (req, res) => {
+  app.post("/api/goals", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertGoalSchema.parse(req.body);
       const goal = await storage.createGoal(validatedData);
@@ -414,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/goals/:id", async (req, res) => {
+  app.patch("/api/goals/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertGoalSchema.partial().parse(req.body);
@@ -426,7 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/goals/:id", async (req, res) => {
+  app.delete("/api/goals/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteGoal(id);
@@ -438,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Checklists endpoints
-  app.get("/api/checklists/by-resident/:residentId", async (req, res) => {
+  app.get("/api/checklists/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const checklist = await storage.getChecklistByResident(residentId);
@@ -449,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/checklists", async (req, res) => {
+  app.post("/api/checklists", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertChecklistSchema.parse(req.body);
       
@@ -471,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Chores endpoints
-  app.get("/api/chores/by-resident/:residentId", async (req, res) => {
+  app.get("/api/chores/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const chores = await storage.getChoresByResident(residentId);
@@ -482,7 +486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/chores", async (req, res) => {
+  app.post("/api/chores", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertChoreSchema.parse(req.body);
       const chore = await storage.createChore(validatedData);
@@ -493,7 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/chores/:id", async (req, res) => {
+  app.patch("/api/chores/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertChoreSchema.partial().parse(req.body);
@@ -505,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/chores/:id", async (req, res) => {
+  app.delete("/api/chores/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteChore(id);
@@ -517,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Accomplishments endpoints
-  app.get("/api/accomplishments/by-resident/:residentId", async (req, res) => {
+  app.get("/api/accomplishments/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const accomplishments = await storage.getAccomplishmentsByResident(residentId);
@@ -528,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/accomplishments", async (req, res) => {
+  app.post("/api/accomplishments", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertAccomplishmentSchema.parse(req.body);
       const accomplishment = await storage.createAccomplishment(validatedData);
@@ -539,7 +543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/accomplishments/:id", async (req, res) => {
+  app.patch("/api/accomplishments/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertAccomplishmentSchema.partial().parse(req.body);
@@ -551,7 +555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/accomplishments/:id", async (req, res) => {
+  app.delete("/api/accomplishments/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteAccomplishment(id);
@@ -563,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Incidents endpoints
-  app.get("/api/incidents/by-resident/:residentId", async (req, res) => {
+  app.get("/api/incidents/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const incidents = await storage.getIncidentsByResident(residentId);
@@ -574,7 +578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/incidents", async (req, res) => {
+  app.post("/api/incidents", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertIncidentSchema.parse(req.body);
       const incident = await storage.createIncident(validatedData);
@@ -585,7 +589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/incidents/:id", async (req, res) => {
+  app.patch("/api/incidents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertIncidentSchema.partial().parse(req.body);
@@ -597,7 +601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/incidents/:id", async (req, res) => {
+  app.delete("/api/incidents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteIncident(id);
@@ -609,7 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Meetings endpoints
-  app.get("/api/meetings/by-resident/:residentId", async (req, res) => {
+  app.get("/api/meetings/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const meetings = await storage.getMeetingsByResident(residentId);
@@ -620,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/meetings", async (req, res) => {
+  app.post("/api/meetings", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertMeetingSchema.parse(req.body);
       const meeting = await storage.createMeeting(validatedData);
@@ -631,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/meetings/:id", async (req, res) => {
+  app.patch("/api/meetings/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertMeetingSchema.partial().parse(req.body);
@@ -643,7 +647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/meetings/:id", async (req, res) => {
+  app.delete("/api/meetings/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteMeeting(id);
@@ -655,7 +659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Program Fees endpoints
-  app.get("/api/fees/by-resident/:residentId", async (req, res) => {
+  app.get("/api/fees/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const fees = await storage.getProgramFeesByResident(residentId);
@@ -666,7 +670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/fees", async (req, res) => {
+  app.post("/api/fees", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertProgramFeeSchema.parse(req.body);
       const fee = await storage.createProgramFee(validatedData);
@@ -677,7 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/fees/:id", async (req, res) => {
+  app.patch("/api/fees/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       const validatedData = insertProgramFeeSchema.partial().parse(req.body);
@@ -689,7 +693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/fees/:id", async (req, res) => {
+  app.delete("/api/fees/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteProgramFee(id);
@@ -701,7 +705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notes endpoints
-  app.get("/api/notes/by-resident/:residentId", async (req, res) => {
+  app.get("/api/notes/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
       const notes = await storage.getNotesByResident(residentId);
@@ -712,7 +716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/notes", async (req, res) => {
+  app.post("/api/notes", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertNoteSchema.parse(req.body);
       const note = await storage.createNote(validatedData);

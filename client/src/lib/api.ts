@@ -44,7 +44,13 @@ export async function logout(): Promise<void> {
 
 export function getCurrentUser(): Guide | null {
   const userStr = localStorage.getItem('current-user');
-  return userStr ? JSON.parse(userStr) : null;
+  try {
+    return userStr ? JSON.parse(userStr) : null;
+  } catch (error) {
+    // Clear corrupted user data and return null
+    localStorage.removeItem('current-user');
+    return null;
+  }
 }
 
 export function setCurrentUser(user: Guide) {
