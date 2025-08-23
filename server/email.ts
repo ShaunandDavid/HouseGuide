@@ -34,9 +34,12 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 export function generateVerificationEmail(email: string, token: string, houseName: string, baseUrl: string) {
   const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
   
+  // Using a verified sender email - you'll need to update this with your verified SendGrid sender
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com';
+  
   return {
     to: email,
-    from: 'noreply@houseguide.app',
+    from: fromEmail,
     subject: `Verify your email for ${houseName} - HouseGuide`,
     text: `Welcome to HouseGuide! Please verify your email address by clicking this link: ${verifyUrl}`,
     html: `
