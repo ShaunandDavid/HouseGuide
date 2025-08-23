@@ -12,7 +12,7 @@ export async function ensureAuth(email: string, password: string): Promise<Guide
   }
   
   const authData = await pb.collection('guides').authWithPassword(email, password);
-  return authData.record as Guide;
+  return authData.record as unknown as Guide;
 }
 
 export function logout() {
@@ -20,7 +20,7 @@ export function logout() {
 }
 
 export function getCurrentUser(): Guide | null {
-  return pb.authStore.model as Guide | null;
+  return pb.authStore.model as unknown as Guide | null;
 }
 
 // Houses

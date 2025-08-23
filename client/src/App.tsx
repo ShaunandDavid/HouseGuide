@@ -6,6 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "@/pages/Login";
 import House from "@/pages/House";
 import Resident from "@/pages/Resident";
+import TrackerDashboard from "@/pages/TrackerDashboard";
+import GoalTracker from "@/pages/GoalTracker";
+import ChecklistTracker from "@/pages/ChecklistTracker";
+import ChoreTracker from "@/pages/ChoreTracker";
+import AccomplishmentTracker from "@/pages/AccomplishmentTracker";
+import IncidentTracker from "@/pages/IncidentTracker";
+import MeetingTracker from "@/pages/MeetingTracker";
+import ProgramFeesTracker from "@/pages/ProgramFeesTracker";
 import NotFound from "@/pages/not-found";
 
 // Register service worker for PWA
@@ -25,6 +33,14 @@ function Router() {
       <Route path="/" component={Login} />
       <Route path="/house/:houseId" component={House} />
       <Route path="/resident/:id" component={Resident} />
+      <Route path="/resident/:id/trackers" component={TrackerDashboard} />
+      <Route path="/resident/:id/goals" component={GoalTracker} />
+      <Route path="/resident/:id/checklist" component={ChecklistTracker} />
+      <Route path="/resident/:id/chores" component={ChoreTracker} />
+      <Route path="/resident/:id/accomplishments" component={AccomplishmentTracker} />
+      <Route path="/resident/:id/incidents" component={IncidentTracker} />
+      <Route path="/resident/:id/meetings" component={MeetingTracker} />
+      <Route path="/resident/:id/fees" component={ProgramFeesTracker} />
       <Route component={NotFound} />
     </Switch>
   );

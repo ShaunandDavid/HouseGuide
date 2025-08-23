@@ -1,37 +1,42 @@
-import { type User, type InsertUser } from "@shared/schema";
+import { type Guide, type InsertGuide } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
 // you might need
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getGuide(id: string): Promise<Guide | undefined>;
+  getGuideByEmail(email: string): Promise<Guide | undefined>;
+  createGuide(guide: InsertGuide): Promise<Guide>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private guides: Map<string, Guide>;
 
   constructor() {
-    this.users = new Map();
+    this.guides = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getGuide(id: string): Promise<Guide | undefined> {
+    return this.guides.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+  async getGuideByEmail(email: string): Promise<Guide | undefined> {
+    return Array.from(this.guides.values()).find(
+      (guide) => guide.email === email,
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createGuide(insertGuide: InsertGuide): Promise<Guide> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const guide: Guide = { 
+      ...insertGuide, 
+      id, 
+      created: new Date().toISOString(), 
+      updated: new Date().toISOString() 
+    };
+    this.guides.set(id, guide);
+    return guide;
   }
 }
 

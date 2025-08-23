@@ -136,12 +136,21 @@ export default function ResidentPage() {
               </p>
             </div>
           </div>
-          <Button 
-            onClick={() => setShowReportModal(true)}
-            data-testid="generate-report-button"
-          >
-            Generate Report
-          </Button>
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline"
+              onClick={() => setLocation(`/resident/${resident.id}/trackers`)}
+              data-testid="view-trackers-button"
+            >
+              View Trackers
+            </Button>
+            <Button 
+              onClick={() => setShowReportModal(true)}
+              data-testid="generate-report-button"
+            >
+              Generate Report
+            </Button>
+          </div>
         </div>
       </header>
 
