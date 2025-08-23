@@ -30,10 +30,21 @@ export default function ChoreTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load chores from PocketBase
-      setChores([]);
+      // Load chores from API
+      try {
+        const response = await fetch(`/api/chores/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const choresData = await response.json();
+          setChores(choresData);
+        }
+      } catch (error) {
+        // Chores data not available
+        setChores([]);
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",

@@ -8,7 +8,7 @@ export const pb = new PocketBase(PB_URL);
 // Authentication
 export async function ensureAuth(email: string, password: string): Promise<Guide> {
   if (pb.authStore.isValid) {
-    return pb.authStore.model as Guide;
+    return pb.authStore.model as unknown as Guide;
   }
   
   const authData = await pb.collection('guides').authWithPassword(email, password);

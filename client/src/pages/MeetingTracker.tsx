@@ -30,10 +30,21 @@ export default function MeetingTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load meetings from PocketBase
-      setMeetings([]);
+      // Load meetings from API  
+      try {
+        const response = await fetch(`/api/meetings/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const meetingsData = await response.json();
+          setMeetings(meetingsData);
+        }
+      } catch (error) {
+        // Meetings data not available
+        setMeetings([]);
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",

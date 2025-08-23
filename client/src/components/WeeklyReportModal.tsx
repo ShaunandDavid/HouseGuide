@@ -48,7 +48,7 @@ export function WeeklyReportModal({ isOpen, onClose, resident }: WeeklyReportMod
         setSections({});
       }
     } catch (error) {
-      console.error('Failed to load existing report:', error);
+      // Failed to load existing report - handled gracefully
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +74,7 @@ export function WeeklyReportModal({ isOpen, onClose, resident }: WeeklyReportMod
         description: "Report draft has been saved successfully.",
       });
     } catch (error) {
-      console.error('Failed to save draft:', error);
+      // Failed to save draft - handled in UI
       toast({
         title: "Save Failed",
         description: "Failed to save the draft. Please try again.",
@@ -102,7 +102,7 @@ export function WeeklyReportModal({ isOpen, onClose, resident }: WeeklyReportMod
       // Reset copy state after 2 seconds
       setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy report:', error);
+      // Failed to copy report - handled in UI
       toast({
         title: "Copy Failed",
         description: "Failed to copy report to clipboard.",

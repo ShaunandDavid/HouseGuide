@@ -30,10 +30,21 @@ export default function AccomplishmentTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load accomplishments from PocketBase
-      setAccomplishments([]);
+      // Load accomplishments from API
+      try {
+        const response = await fetch(`/api/accomplishments/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const accomplishmentsData = await response.json();
+          setAccomplishments(accomplishmentsData);
+        }
+      } catch (error) {
+        // Accomplishments data not available
+        setAccomplishments([]);
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",

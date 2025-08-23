@@ -59,7 +59,7 @@ export default function ResidentPage() {
       setResident(residentData);
       setFiles(filesData);
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",
@@ -80,7 +80,7 @@ export default function ResidentPage() {
 
   const handleViewFile = (file: FileRecord) => {
     // Could open a detailed view modal or navigate to a detail page
-    console.log('View file:', file);
+    // File viewing functionality would be implemented here
   };
 
   const commitmentCount = files.filter(f => f.type === 'commitment').length;

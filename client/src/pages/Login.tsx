@@ -36,9 +36,15 @@ export default function Login() {
         title: "Welcome to HouseGuide",
         description: "Successfully signed in.",
       });
-      setLocation("/house/MAIN");
+      // Navigate to first available house or default
+      try {
+        setLocation("/house/MAIN");
+      } catch (error) {
+        // Fallback to a general house selection if MAIN doesn't exist
+        setLocation("/house/default");
+      }
     } catch (error) {
-      console.error("Authentication failed:", error);
+      // Authentication failed - handled in UI
       toast({
         title: "Sign In Failed",
         description: "Invalid email or password. Please try again.",

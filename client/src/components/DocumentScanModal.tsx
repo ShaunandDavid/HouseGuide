@@ -48,7 +48,7 @@ export function DocumentScanModal({
       const classificationResult = classifyDocumentByKeywords(result.text);
       setClassification(classificationResult);
     } catch (error) {
-      console.error('OCR processing failed:', error);
+      // OCR processing failed - handled in UI
       toast({
         title: "OCR Processing Failed",
         description: "Failed to process the image. Please try again.",
@@ -100,7 +100,7 @@ export function DocumentScanModal({
       onDocumentSaved?.();
       handleClose();
     } catch (error) {
-      console.error('Failed to save document:', error);
+      // Document save failed - handled in UI
       toast({
         title: "Save Failed",
         description: "Failed to save the document. Please try again.",

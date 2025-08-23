@@ -30,10 +30,21 @@ export default function GoalTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load goals from PocketBase
-      setGoals([]);
+      // Load goals from API
+      try {
+        const response = await fetch(`/api/goals/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const goalsData = await response.json();
+          setGoals(goalsData);
+        }
+      } catch (error) {
+        // Goals data not available, continue with empty array
+        setGoals([]);
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",

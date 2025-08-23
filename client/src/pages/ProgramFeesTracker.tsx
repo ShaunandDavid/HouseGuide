@@ -30,10 +30,21 @@ export default function ProgramFeesTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load fees from PocketBase
-      setFees([]);
+      // Load fees from API
+      try {
+        const response = await fetch(`/api/fees/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const feesData = await response.json();
+          setFees(feesData);
+        }
+      } catch (error) {
+        // Fees data not available
+        setFees([]);
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",

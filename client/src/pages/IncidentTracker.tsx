@@ -30,10 +30,21 @@ export default function IncidentTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load incidents from PocketBase
-      setIncidents([]);
+      // Load incidents from API
+      try {
+        const response = await fetch(`/api/incidents/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const incidentsData = await response.json();
+          setIncidents(incidentsData);
+        }
+      } catch (error) {
+        // Incidents data not available
+        setIncidents([]);
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",

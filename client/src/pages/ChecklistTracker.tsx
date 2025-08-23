@@ -42,17 +42,46 @@ export default function ChecklistTracker() {
     try {
       const residentData = await getResident(id);
       setResident(residentData);
-      // TODO: Load checklist from PocketBase
-      setChecklist(null);
-      setFormData({
-        phase: '',
-        homeGroup: '',
-        stepWork: '',
-        professionalHelp: '',
-        job: ''
-      });
+      // Load checklist from API
+      try {
+        const response = await fetch(`/api/checklists/by-resident/${id}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const checklistData = await response.json();
+          if (checklistData) {
+            setChecklist(checklistData);
+            setFormData({
+              phase: checklistData.phase || '',
+              homeGroup: checklistData.homeGroup || '',
+              stepWork: checklistData.stepWork || '',
+              professionalHelp: checklistData.professionalHelp || '',
+              job: checklistData.job || ''
+            });
+          } else {
+            setChecklist(null);
+            setFormData({
+              phase: '',
+              homeGroup: '',
+              stepWork: '',
+              professionalHelp: '',
+              job: ''
+            });
+          }
+        }
+      } catch (error) {
+        // Checklist data not available
+        setChecklist(null);
+        setFormData({
+          phase: '',
+          homeGroup: '',
+          stepWork: '',
+          professionalHelp: '',
+          job: ''
+        });
+      }
     } catch (error) {
-      console.error("Failed to load resident data:", error);
+      // Failed to load resident data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load resident information.",
@@ -72,15 +101,34 @@ export default function ChecklistTracker() {
   };
 
   const handleSave = async () => {
+    if (!id) return;
+    
     setIsSaving(true);
     try {
-      // TODO: Save checklist to PocketBase
-      toast({
-        title: "Checklist Saved",
-        description: "Client checklist has been updated successfully.",
+      const response = await fetch('/api/checklists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          resident: id,
+          ...formData,
+          lastUpdated: new Date().toISOString()
+        })
       });
+
+      if (response.ok) {
+        const savedChecklist = await response.json();
+        setChecklist(savedChecklist);
+        toast({
+          title: "Checklist Saved",
+          description: "Client checklist has been updated successfully.",
+        });
+      } else {
+        throw new Error('Failed to save checklist');
+      }
     } catch (error) {
-      console.error("Failed to save checklist:", error);
       toast({
         title: "Save Failed",
         description: "Failed to save the checklist. Please try again.",

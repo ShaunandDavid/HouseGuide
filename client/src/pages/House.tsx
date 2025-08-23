@@ -53,7 +53,7 @@ export default function House() {
               writeupCount
             };
           } catch (error) {
-            console.error(`Failed to load files for resident ${resident.id}:`, error);
+            // Failed to load files for resident - handled gracefully
             return {
               ...resident,
               commitmentCount: 0,
@@ -65,7 +65,7 @@ export default function House() {
       
       setResidents(residentsWithCounts);
     } catch (error) {
-      console.error("Failed to load house data:", error);
+      // Failed to load house data - handled in UI
       toast({
         title: "Error Loading Data",
         description: "Failed to load house and resident information.",

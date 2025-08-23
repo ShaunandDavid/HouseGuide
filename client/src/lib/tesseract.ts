@@ -9,24 +9,28 @@ export async function processImageWithOCR(
   imageFile: File,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> {
-  return new Promise((resolve, reject) => {
-    const imageUrl = URL.createObjectURL(imageFile);
+  let imageUrl: string | null = null;
+  
+  try {
+    imageUrl = URL.createObjectURL(imageFile);
     
-    Tesseract.recognize(imageUrl, 'eng', {
+    const { data } = await Tesseract.recognize(imageUrl, 'eng', {
       logger: m => {
         if (m.status === 'recognizing text' && onProgress) {
           onProgress(m.progress);
         }
       }
-    }).then(({ data }) => {
-      URL.revokeObjectURL(imageUrl);
-      resolve({
-        text: data.text,
-        confidence: data.confidence
-      });
-    }).catch(error => {
-      URL.revokeObjectURL(imageUrl);
-      reject(error);
     });
-  });
+    
+    return {
+      text: data.text,
+      confidence: data.confidence
+    };
+  } catch (error) {
+    throw error;
+  } finally {
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+    }
+  }
 }
