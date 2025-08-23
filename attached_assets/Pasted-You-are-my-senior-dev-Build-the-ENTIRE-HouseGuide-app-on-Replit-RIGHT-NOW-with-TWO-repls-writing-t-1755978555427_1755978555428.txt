@@ -1,0 +1,407 @@
+You are my senior dev. Build the ENTIRE HouseGuide app on Replit RIGHT NOW with TWO repls, writing the exact files below (no placeholders).
+
+GOAL
+- PWA web app (Android installable) that scans photos with on-device OCR (Tesseract.js), auto-classifies into Commitments vs Write-Ups, stores per-resident files, and generates a 5-section weekly report with one-tap Copy.
+- Backend = PocketBase (auth, storage, rules).
+- Costs: $0. No cloud AI. Only first-name + last-initial + internal IDs.
+
+========================================================
+REPL #1 — Backend (PocketBase)
+========================================================
+1) Create a new Repl: **Bash** → name it: `houseguide-pb`.
+
+2) In shell, download PocketBase 0.22.15 (linux amd64) and prep data dir:
+   curl -L -o pb.zip https://github.com/pocketbase/pocketbase/releases/download/v0.22.15/pocketbase_0.22.15_linux_amd64.zip
+   unzip pb.zip -d pb && rm pb.zip
+   mkdir -p pb/pb_data
+
+3) Create file **run.sh** with EXACT content:
+   ----8<---- run.sh
+   #!/usr/bin/env bash
+   cd pb
+   ./pocketbase serve --http 0.0.0.0:8000
+   ----8<----
+
+4) chmod +x run.sh and set the Replit "Run" command to: ./run.sh
+
+5) Create file **collections_seed.json** with EXACT content (schema + basic rules):
+   ----8<---- collections_seed.json
+   {
+     "collections": [
+       {
+         "name": "guides",
+         "type": "auth",
+         "schema": [
+           { "name": "name", "type": "text", "required": true, "options": { "min": 1, "max": 120 } }
+         ],
+         "indexes": [],
+         "listRule": null,
+         "viewRule": "@request.auth.id != \"\"",
+         "createRule": null,
+         "updateRule": "@request.auth.id = id",
+         "deleteRule": "@request.auth.id = id",
+         "options": {
+           "allowEmailAuth": true,
+           "allowUsernameAuth": false,
+           "minPasswordLength": 8,
+           "requireEmail": true
+         }
+       },
+       {
+         "name": "houses",
+         "type": "base",
+         "schema": [
+           { "name": "name", "type": "text", "required": true, "options": { "min": 1, "max": 80 } }
+         ],
+         "indexes": [],
+         "listRule": "@request.auth.id != \"\"",
+         "viewRule": "@request.auth.id != \"\"",
+         "createRule": "@request.auth.id != \"\"",
+         "updateRule": "@request.auth.id != \"\"",
+         "deleteRule": "@request.auth.id != \"\"",
+         "options": {}
+       },
+       {
+         "name": "residents",
+         "type": "base",
+         "schema": [
+           { "name": "house", "type": "relation", "required": true, "options": { "collectionId": "houses", "cascadeDelete": false, "minSelect": 1, "maxSelect": 1, "displayFields": [] } },
+           { "name": "firstName", "type": "text", "required": true, "options": { "min": 1, "max": 60 } },
+           { "name": "lastInitial", "type": "text", "required": true, "options": { "min": 1, "max": 2 } },
+           { "name": "status", "type": "select", "required": false, "options": { "values": ["active","inactive","graduated"] } },
+           { "name": "residentId", "type": "text", "required": false, "options": { "min": 1, "max": 40 } }
+         ],
+         "indexes": [],
+         "listRule": "@request.auth.id != \"\"",
+         "viewRule": "@request.auth.id != \"\"",
+         "createRule": "@request.auth.id != \"\"",
+         "updateRule": "@request.auth.id != \"\"",
+         "deleteRule": "@request.auth.id != \"\"",
+         "options": {}
+       },
+       {
+         "name": "files",
+         "type": "base",
+         "schema": [
+           { "name": "resident", "type": "relation", "required": true, "options": { "collectionId": "residents", "cascadeDelete": false, "minSelect": 1, "maxSelect": 1, "displayFields": [] } },
+           { "name": "type", "type": "select", "required": true, "options": { "values": ["commitment","writeup"] } },
+           { "name": "image", "type": "file", "required": true, "options": { "maxSelect": 1, "maxSize": 20971520, "mimeTypes": ["image/*","application/pdf"] } },
+           { "name": "ocrText", "type": "text", "required": false, "options": { "min": 0, "max": 131072 } }
+         ],
+         "indexes": [],
+         "listRule": "@request.auth.id != \"\"",
+         "viewRule": "@request.auth.id != \"\"",
+         "createRule": "@request.auth.id != \"\"",
+         "updateRule": "@request.auth.id != \"\"",
+         "deleteRule": "@request.auth.id != \"\"",
+         "options": {}
+       },
+       {
+         "name": "notes",
+         "type": "base",
+         "schema": [
+           { "name": "resident", "type": "relation", "required": true, "options": { "collectionId": "residents", "cascadeDelete": false, "minSelect": 1, "maxSelect": 1, "displayFields": [] } },
+           { "name": "type", "type": "select", "required": false, "options": { "values": ["general","commitment","writeup"] } },
+           { "name": "text", "type": "text", "required": false, "options": { "min": 0, "max": 65536 } }
+         ],
+         "indexes": [],
+         "listRule": "@request.auth.id != \"\"",
+         "viewRule": "@request.auth.id != \"\"",
+         "createRule": "@request.auth.id != \"\"",
+         "updateRule": "@request.auth.id != \"\"",
+         "deleteRule": "@request.auth.id != \"\"",
+         "options": {}
+       },
+       {
+         "name": "reports",
+         "type": "base",
+         "schema": [
+           { "name": "resident", "type": "relation", "required": true, "options": { "collectionId": "residents", "cascadeDelete": false, "minSelect": 1, "maxSelect": 1, "displayFields": [] } },
+           { "name": "weekStart", "type": "date", "required": true, "options": {} },
+           { "name": "s1_sponsor", "type": "text", "required": false, "options": { "min": 0, "max": 65536 } },
+           { "name": "s2_work", "type": "text", "required": false, "options": { "min": 0, "max": 65536 } },
+           { "name": "s3_chores", "type": "text", "required": false, "options": { "min": 0, "max": 65536 } },
+           { "name": "s4_demeanor", "type": "text", "required": false, "options": { "min": 0, "max": 65536 } },
+           { "name": "s5_professional", "type": "text", "required": false, "options": { "min": 0, "max": 65536 } }
+         ],
+         "indexes": [],
+         "listRule": "@request.auth.id != \"\"",
+         "viewRule": "@request.auth.id != \"\"",
+         "createRule": "@request.auth.id != \"\"",
+         "updateRule": "@request.auth.id != \"\"",
+         "deleteRule": "@request.auth.id != \"\"",
+         "options": {}
+       }
+     ]
+   }
+   ----8<----
+
+6) Press **Run** to start PocketBase. 
+   - Visit `/_/` in the webview.
+   - Create the **first admin user** (email + password).
+   - In Admin → **Settings → Import Collections**, upload **collections_seed.json**.
+   - In **houses**, create a record with name: `MAIN`.
+
+7) Copy this backend URL (shown in the Replit webview, e.g., `https://houseguide-pb.<id>.repl.co`).
+
+========================================================
+REPL #2 — Frontend (React + Vite PWA)
+========================================================
+1) Create a new Repl: **Node.js** → name it: `houseguide-pwa`.
+
+2) In shell:
+   npm create vite@latest app -- --template react
+   cd app
+   npm i pocketbase tesseract.js jspdf idb react-router-dom
+
+3) Create/overwrite the following files with EXACT contents:
+
+--- index.html (at app/index.html) ---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="manifest" href="/manifest.webmanifest">
+    <title>HouseGuide</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+--- public/manifest.webmanifest (create app/public/manifest.webmanifest) ---
+{
+  "name": "HouseGuide",
+  "short_name": "HouseGuide",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f1a",
+  "theme_color": "#0b0f1a",
+  "icons": []
+}
+
+--- public/sw.js (create app/public/sw.js) ---
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => self.clients.claim());
+self.addEventListener('fetch', () => {});
+
+--- src/api.js (create app/src/api.js) ---
+import PocketBase from 'pocketbase';
+export const pb = new PocketBase(import.meta.env.VITE_PB_URL);
+export async function ensureAuth(email, password){
+  if(pb.authStore.isValid) return pb.authStore.model;
+  return pb.collection('guides').authWithPassword(email, password);
+}
+
+--- src/utils/classify.js (create app/src/utils/classify.js) ---
+const WU = ["write up","write-up","incident","violation","warning","policy","consequence"];
+const CM = ["commitment","goal","plan","amends","step","sponsor","mentor","aa","na","meeting"];
+export function classifyByKeywords(txt){
+  const t = (txt||'').toLowerCase();
+  const score = {writeup:0, commitment:0};
+  WU.forEach(k=>{ if(t.includes(k)) score.writeup++; });
+  CM.forEach(k=>{ if(t.includes(k)) score.commitment++; });
+  if(score.writeup===0 && score.commitment===0) return {label:null, confidence:0};
+  const label = score.writeup>score.commitment? 'writeup':'commitment';
+  const confidence = Math.max(score.writeup, score.commitment)/(score.writeup+score.commitment);
+  return {label, confidence};
+}
+
+--- src/utils/report.js (create app/src/utils/report.js) ---
+export function weeklyTemplate(resident, weekStart, entries){
+  const pick = (k)=> (entries?.[k]?.trim?.() || 'N/A');
+  const d = new Date(weekStart);
+  const weekStr = isNaN(d) ? weekStart : d.toLocaleDateString();
+  return `Resident: ${resident.firstName} ${resident.lastInitial}.  Week of: ${weekStr}
+
+__Sponsor/Mentor:__ ${pick('s1_sponsor')}
+
+__Work/School:__ ${pick('s2_work')}
+
+__Chores/Compliance:__ ${pick('s3_chores')}
+
+__Demeanor / Participation:__ ${pick('s4_demeanor')}
+
+__Professional Help / Appointments:__ ${pick('s5_professional')}
+`;
+}
+
+--- src/main.jsx (create app/src/main.jsx) ---
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Login from './pages/Login.jsx'
+import House from './pages/House.jsx'
+import Resident from './pages/Resident.jsx'
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js');
+}
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login/>} />
+        <Route path="/house/:houseId" element={<House/>} />
+        <Route path="/resident/:id" element={<Resident/>} />
+      </Routes>
+    </BrowserRouter>
+  </React.StrictMode>
+)
+
+--- src/pages/Login.jsx (create app/src/pages/Login.jsx) ---
+import React, {useState} from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ensureAuth } from '../api'
+
+export default function Login(){
+  const [email,setEmail]=useState('')
+  const [pw,setPw]=useState('')
+  const nav = useNavigate()
+  const go = async(e)=>{
+    e.preventDefault()
+    await ensureAuth(email,pw)
+    nav('/house/MAIN')
+  }
+  return (
+    <div style={{maxWidth:480,margin:'32px auto',fontFamily:'system-ui'}}>
+      <h2>HouseGuide — Sign in</h2>
+      <form onSubmit={go}>
+        <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={{width:'100%',padding:12,margin:'8px 0'}}/>
+        <input type="password" placeholder="Password" value={pw} onChange={e=>setPw(e.target.value)} style={{width:'100%',padding:12,margin:'8px 0'}}/>
+        <button style={{padding:12,width:'100%'}}>Sign in</button>
+      </form>
+    </div>
+  )
+}
+
+--- src/pages/House.jsx (create app/src/pages/House.jsx) ---
+import React, {useEffect,useState} from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { pb } from '../api'
+
+export default function House(){
+  const {houseId}=useParams()
+  const [residents,setResidents]=useState([])
+  useEffect(()=>{
+    (async()=>{
+      const house = await pb.collection('houses').getFirstListItem(`name = "${houseId}"`)
+      const list = await pb.collection('residents').getFullList({ filter: `house = "${house.id}"` })
+      setResidents(list)
+    })()
+  },[])
+  return (
+    <div style={{padding:16,fontFamily:'system-ui'}}>
+      <h2>Residents — {houseId}</h2>
+      <ul>
+        {residents.map(r=> (
+          <li key={r.id} style={{margin:'8px 0'}}>
+            <Link to={`/resident/${r.id}`}>{r.firstName} {r.lastInitial}.</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+--- src/pages/Resident.jsx (create app/src/pages/Resident.jsx) ---
+import React,{useEffect,useState} from 'react'
+import { useParams } from 'react-router-dom'
+import { pb } from '../api'
+import Tesseract from 'tesseract.js'
+import { classifyByKeywords } from '../utils/classify'
+import { weeklyTemplate } from '../utils/report'
+
+export default function Resident(){
+  const {id}=useParams()
+  const [resident,setResident]=useState(null)
+  const [files,setFiles]=useState([])
+  const [week,setWeek]=useState(() => new Date(new Date().setDate(new Date().getDate()-new Date().getDay()+1)).toISOString().slice(0,10)) // Monday
+  const [sections,setSections]=useState({})
+  const [busy,setBusy]=useState(false)
+
+  useEffect(()=>{ (async()=>{
+    const r = await pb.collection('residents').getOne(id)
+    setResident(r)
+    const fl = await pb.collection('files').getFullList({ filter: `resident = "${id}"` , sort:'-created'})
+    setFiles(fl)
+  })() },[id])
+
+  async function handleImage(e){
+    const file = e.target.files?.[0]; if(!file) return;
+    setBusy(true)
+    const imgUrl = URL.createObjectURL(file)
+    const { data:{ text } } = await Tesseract.recognize(imgUrl, 'eng')
+    const {label,confidence}= classifyByKeywords(text)
+    let type = label
+    if(!type || confidence < 0.6){
+      type = window.confirm('Looks like COMMITMENT. OK = Commitment, Cancel = Write-Up') ? 'commitment' : 'writeup'
+    }
+    const fd = new FormData()
+    fd.append('resident', id)
+    fd.append('type', type)
+    fd.append('image', file)
+    fd.append('ocrText', text)
+    await pb.collection('files').create(fd)
+    const fl = await pb.collection('files').getFullList({ filter: `resident = "${id}"` , sort:'-created'})
+    setFiles(fl); setBusy(false)
+  }
+
+  async function copyWeekly(){
+    const entry = await pb.collection('reports').getFirstListItem(`resident = "${id}" && weekStart = "${week}"`,{requestKey: undefined}).catch(()=>null)
+    const txt = weeklyTemplate(resident, week, entry||sections)
+    await navigator.clipboard.writeText(txt)
+    alert('Weekly report copied to clipboard')
+  }
+
+  return (
+    <div style={{padding:16,fontFamily:'system-ui'}}>
+      <h2>{resident? `${resident.firstName} ${resident.lastInitial}.` : '...'} — Weekly</h2>
+
+      <div style={{margin:'12px 0',display:'grid',gap:8}}>
+        <label>Week start (Mon): <input type="date" value={week} onChange={e=>setWeek(e.target.value)} /></label>
+        <input placeholder="Sponsor/Mentor" onChange={e=>setSections(s=>({...s,s1_sponsor:e.target.value}))} />
+        <input placeholder="Work/School" onChange={e=>setSections(s=>({...s,s2_work:e.target.value}))} />
+        <input placeholder="Chores/Compliance" onChange={e=>setSections(s=>({...s,s3_chores:e.target.value}))} />
+        <input placeholder="Demeanor/Participation" onChange={e=>setSections(s=>({...s,s4_demeanor:e.target.value}))} />
+        <input placeholder="Professional Help/Appointments" onChange={e=>setSections(s=>({...s,s5_professional:e.target.value}))} />
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={copyWeekly}>Copy Weekly</button>
+          <label style={{border:'1px solid #ccc',padding:'8px',cursor:'pointer'}}>
+            {busy? 'Scanning…' : 'Scan/Upload Photo'}
+            <input type="file" accept="image/*" capture="environment" onChange={handleImage} style={{display:'none'}} />
+          </label>
+        </div>
+      </div>
+
+      <h3>Files</h3>
+      <ul>
+        {files.map(f=> (
+          <li key={f.id}>
+            [{f.type}] <a href={`${pb.baseUrl}/api/files/files/${f.id}/${f.image}`} target="_blank" rel="noreferrer">view</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+-------------------------------------------------------
+
+4) In this frontend repl, open Replit **Secrets** and add:
+   - Key: VITE_PB_URL
+   - Value: (paste the backend URL from REPL #1, e.g., https://houseguide-pb.<id>.repl.co)
+
+5) Run:
+   npm run dev
+   Open the webview → app loads. Use the admin panel to create a guide user (email+password) in `guides`, then sign in from the app and go to /house/MAIN.
+
+========================================================
+PWA → Play Store (optional, invite-only)
+========================================================
+- Later, host the frontend at a stable HTTPS domain (e.g., https://app.level7hq.com).
+- Use Bubblewrap (TWA) to generate an Android .aab for Internal/Closed Testing.
+
+DONE. Keep everything at $0. No placeholders. Build now.
