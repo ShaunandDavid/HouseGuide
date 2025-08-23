@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Plus, DollarSign, Calendar, CheckCircle } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getFeesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, ProgramFee } from "@shared/schema";
 
@@ -32,13 +32,8 @@ export default function ProgramFeesTracker() {
       setResident(residentData);
       // Load fees from API
       try {
-        const response = await fetch(`/api/fees/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const feesData = await response.json();
-          setFees(feesData);
-        }
+        const feesData = await getFeesByResident(id);
+        setFees(feesData);
       } catch (error) {
         // Fees data not available
         setFees([]);

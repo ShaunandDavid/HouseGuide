@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Plus, Users, Calendar, Clock, MapPin } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getMeetingsByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Meeting } from "@shared/schema";
 
@@ -32,13 +32,8 @@ export default function MeetingTracker() {
       setResident(residentData);
       // Load meetings from API  
       try {
-        const response = await fetch(`/api/meetings/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const meetingsData = await response.json();
-          setMeetings(meetingsData);
-        }
+        const meetingsData = await getMeetingsByResident(id);
+        setMeetings(meetingsData);
       } catch (error) {
         // Meetings data not available
         setMeetings([]);

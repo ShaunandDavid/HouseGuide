@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { X, Copy, Check, Users, Briefcase, ListChecks, Users as UsersIcon, Stethoscope } from "lucide-react";
 import { generateWeeklyReport, getWeekStartDate, type ReportSections } from "@/lib/report";
-import { createOrUpdateReport, getReport } from "@/lib/pocketbase";
+import { createOrUpdateReport, getReport } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident } from "@shared/schema";
 

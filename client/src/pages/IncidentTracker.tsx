@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Plus, AlertTriangle, Calendar, AlertCircle } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getIncidentsByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Incident } from "@shared/schema";
 
@@ -32,13 +32,8 @@ export default function IncidentTracker() {
       setResident(residentData);
       // Load incidents from API
       try {
-        const response = await fetch(`/api/incidents/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const incidentsData = await response.json();
-          setIncidents(incidentsData);
-        }
+        const incidentsData = await getIncidentsByResident(id);
+        setIncidents(incidentsData);
       } catch (error) {
         // Incidents data not available
         setIncidents([]);

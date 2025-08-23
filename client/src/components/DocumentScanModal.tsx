@@ -6,7 +6,7 @@ import { Loading } from "@/components/ui/loading";
 import { Camera, Upload, X } from "lucide-react";
 import { processImageWithOCR } from "@/lib/tesseract";
 import { classifyDocumentByKeywords } from "@/lib/classify";
-import { createFile } from "@/lib/pocketbase";
+import { createFile } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface DocumentScanModalProps {
@@ -84,13 +84,12 @@ export function DocumentScanModal({
     }
 
     try {
-      const formData = new FormData();
-      formData.append('resident', residentId);
-      formData.append('type', finalType);
-      formData.append('image', selectedFile);
-      formData.append('ocrText', ocrResult);
-
-      await createFile(formData);
+      await createFile({
+        resident: residentId,
+        type: finalType,
+        image: selectedFile,
+        ocrText: ocrResult
+      });
       
       toast({
         title: "Document Saved",

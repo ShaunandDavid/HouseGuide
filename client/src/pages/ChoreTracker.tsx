@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Plus, Home, Calendar, Clock } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getChoresByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Chore } from "@shared/schema";
 
@@ -32,13 +32,8 @@ export default function ChoreTracker() {
       setResident(residentData);
       // Load chores from API
       try {
-        const response = await fetch(`/api/chores/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const choresData = await response.json();
-          setChores(choresData);
-        }
+        const choresData = await getChoresByResident(id);
+        setChores(choresData);
       } catch (error) {
         // Chores data not available
         setChores([]);

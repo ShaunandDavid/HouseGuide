@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/ui/loading";
 import { Home } from "lucide-react";
-import { ensureAuth } from "@/lib/pocketbase";
+import { login, setCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
@@ -31,18 +31,14 @@ export default function Login() {
     setIsLoading(true);
     
     try {
-      await ensureAuth(email, password);
+      const { user, token } = await login(email, password);
+      setCurrentUser(user, token);
       toast({
         title: "Welcome to HouseGuide",
         description: "Successfully signed in.",
       });
       // Navigate to first available house or default
-      try {
-        setLocation("/house/MAIN");
-      } catch (error) {
-        // Fallback to a general house selection if MAIN doesn't exist
-        setLocation("/house/default");
-      }
+      setLocation("/house/MAIN");
     } catch (error) {
       // Authentication failed - handled in UI
       toast({

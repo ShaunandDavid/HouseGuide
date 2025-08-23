@@ -13,6 +13,7 @@ export interface Guide {
   id: string;
   email: string;
   name: string;
+  password: string;
   created: string;
   updated: string;
 }

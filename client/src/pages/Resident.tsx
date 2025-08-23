@@ -15,7 +15,7 @@ import {
   Users, 
   AlertTriangle 
 } from "lucide-react";
-import { getResident, getFilesByResident } from "@/lib/pocketbase";
+import { getResident, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, FileRecord } from "@shared/schema";
 

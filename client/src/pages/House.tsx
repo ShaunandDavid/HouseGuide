@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { Home, User, ChevronRight, Settings } from "lucide-react";
-import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/pocketbase";
+import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { House, Resident, FileRecord } from "@shared/schema";
 

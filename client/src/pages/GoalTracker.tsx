@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Plus, Target, Calendar, Flag } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getGoalsByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Goal } from "@shared/schema";
 
@@ -32,13 +32,8 @@ export default function GoalTracker() {
       setResident(residentData);
       // Load goals from API
       try {
-        const response = await fetch(`/api/goals/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const goalsData = await response.json();
-          setGoals(goalsData);
-        }
+        const goalsData = await getGoalsByResident(id);
+        setGoals(goalsData);
       } catch (error) {
         // Goals data not available, continue with empty array
         setGoals([]);

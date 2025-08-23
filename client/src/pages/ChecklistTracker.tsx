@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Save, CheckSquare, User, Home, Book, Stethoscope, Briefcase } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getChecklistByResident, createOrUpdateChecklist } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Checklist } from "@shared/schema";
 
@@ -44,30 +44,25 @@ export default function ChecklistTracker() {
       setResident(residentData);
       // Load checklist from API
       try {
-        const response = await fetch(`/api/checklists/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const checklistData = await response.json();
-          if (checklistData) {
-            setChecklist(checklistData);
-            setFormData({
-              phase: checklistData.phase || '',
-              homeGroup: checklistData.homeGroup || '',
-              stepWork: checklistData.stepWork || '',
-              professionalHelp: checklistData.professionalHelp || '',
-              job: checklistData.job || ''
-            });
-          } else {
-            setChecklist(null);
-            setFormData({
-              phase: '',
-              homeGroup: '',
-              stepWork: '',
-              professionalHelp: '',
-              job: ''
-            });
-          }
+        const checklistData = await getChecklistByResident(id);
+        if (checklistData) {
+          setChecklist(checklistData);
+          setFormData({
+            phase: checklistData.phase || '',
+            homeGroup: checklistData.homeGroup || '',
+            stepWork: checklistData.stepWork || '',
+            professionalHelp: checklistData.professionalHelp || '',
+            job: checklistData.job || ''
+          });
+        } else {
+          setChecklist(null);
+          setFormData({
+            phase: '',
+            homeGroup: '',
+            stepWork: '',
+            professionalHelp: '',
+            job: ''
+          });
         }
       } catch (error) {
         // Checklist data not available
@@ -105,29 +100,16 @@ export default function ChecklistTracker() {
     
     setIsSaving(true);
     try {
-      const response = await fetch('/api/checklists', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          resident: id,
-          ...formData,
-          lastUpdated: new Date().toISOString()
-        })
+      const savedChecklist = await createOrUpdateChecklist({
+        resident: id,
+        ...formData,
+        lastUpdated: new Date().toISOString()
       });
-
-      if (response.ok) {
-        const savedChecklist = await response.json();
-        setChecklist(savedChecklist);
-        toast({
-          title: "Checklist Saved",
-          description: "Client checklist has been updated successfully.",
-        });
-      } else {
-        throw new Error('Failed to save checklist');
-      }
+      setChecklist(savedChecklist);
+      toast({
+        title: "Checklist Saved",
+        description: "Client checklist has been updated successfully.",
+      });
     } catch (error) {
       toast({
         title: "Save Failed",

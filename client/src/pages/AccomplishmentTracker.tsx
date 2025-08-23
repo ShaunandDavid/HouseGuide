@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Plus, Award, Calendar } from "lucide-react";
-import { getResident } from "@/lib/pocketbase";
+import { getResident, getAccomplishmentsByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Accomplishment } from "@shared/schema";
 
@@ -32,13 +32,8 @@ export default function AccomplishmentTracker() {
       setResident(residentData);
       // Load accomplishments from API
       try {
-        const response = await fetch(`/api/accomplishments/by-resident/${id}`, {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const accomplishmentsData = await response.json();
-          setAccomplishments(accomplishmentsData);
-        }
+        const accomplishmentsData = await getAccomplishmentsByResident(id);
+        setAccomplishments(accomplishmentsData);
       } catch (error) {
         // Accomplishments data not available
         setAccomplishments([]);
