@@ -58,7 +58,7 @@ export interface Resident {
 export const insertFileSchema = z.object({
   resident: z.string(),
   type: z.enum(["commitment", "writeup"]),
-  image: z.any(), // File upload
+  image: z.string(), // Base64 encoded image or file URL
   ocrText: z.string().optional(),
 });
 

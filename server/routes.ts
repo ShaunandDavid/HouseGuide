@@ -8,6 +8,20 @@ import {
   insertAccomplishmentSchema, insertIncidentSchema, insertMeetingSchema, insertProgramFeeSchema, insertNoteSchema
 } from "@shared/schema";
 
+// Authentication middleware
+function requireAuth(req: any, res: any, next: any) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  // Basic token validation - in production, verify JWT properly
+  const token = authHeader.slice(7);
+  if (!token.startsWith('auth-')) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
@@ -74,8 +88,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Houses endpoints
-  app.get("/api/houses/:name", async (req, res) => {
+  // Houses endpoints (protected)
+  app.get("/api/houses/:name", requireAuth, async (req, res) => {
     try {
       const { name } = req.params;
       const house = await storage.getHouseByName(name);
@@ -89,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/houses", async (req, res) => {
+  app.post("/api/houses", requireAuth, async (req, res) => {
     try {
       const validatedData = insertHouseSchema.parse(req.body);
       const house = await storage.createHouse(validatedData);
@@ -100,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/houses", async (req, res) => {
+  app.get("/api/houses", requireAuth, async (req, res) => {
     try {
       const houses = await storage.getAllHouses();
       res.json(houses);
@@ -110,8 +124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Residents endpoints
-  app.get("/api/residents/by-house/:houseId", async (req, res) => {
+  // Residents endpoints (protected)
+  app.get("/api/residents/by-house/:houseId", requireAuth, async (req, res) => {
     try {
       const { houseId } = req.params;
       const residents = await storage.getResidentsByHouse(houseId);

@@ -27,7 +27,8 @@ export async function processImageWithOCR(
       confidence: data.confidence
     };
   } catch (error) {
-    throw error;
+    console.error('OCR processing failed:', error);
+    throw new Error(`Failed to process image with OCR: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
     if (imageUrl) {
       URL.revokeObjectURL(imageUrl);
