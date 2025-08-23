@@ -31,8 +31,8 @@ export default function Login() {
     setIsLoading(true);
     
     try {
-      const { user, token } = await login(email, password);
-      setCurrentUser(user, token);
+      const { user } = await login(email, password);
+      setCurrentUser(user);
       toast({
         title: "Welcome to HouseGuide",
         description: "Successfully signed in.",

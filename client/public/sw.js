@@ -1,8 +1,6 @@
-const CACHE_NAME = 'houseguide-v1';
+const CACHE_NAME = `houseguide-v${Date.now()}`;  // Dynamic cache versioning
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/manifest.webmanifest'
 ];
 
@@ -11,6 +9,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCache))
   );
+  // Force activation to ensure immediate cache updates
   self.skipWaiting();
 });
 
@@ -26,10 +25,17 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  // Ensure clients get updates immediately
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
+  // Never cache API requests - always fetch fresh data
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

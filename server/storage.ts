@@ -20,7 +20,7 @@ export interface IStorage {
   
   // Residents
   getResident(id: string): Promise<Resident | undefined>;
-  getResidentsByHouse(houseId: string): Promise<Resident[]>;
+  getResidentsByHouse(houseId: string, limit?: number, offset?: number): Promise<Resident[]>;
   createResident(resident: InsertResident): Promise<Resident>;
   updateResident(id: string, updates: Partial<InsertResident>): Promise<Resident>;
   deleteResident(id: string): Promise<void>;
@@ -180,8 +180,10 @@ export class MemStorage implements IStorage {
     return this.residents.get(id);
   }
 
-  async getResidentsByHouse(houseId: string): Promise<Resident[]> {
-    return Array.from(this.residents.values()).filter(resident => resident.house === houseId);
+  async getResidentsByHouse(houseId: string, limit = 100, offset = 0): Promise<Resident[]> {
+    return Array.from(this.residents.values())
+      .filter(resident => resident.house === houseId)
+      .slice(offset, offset + limit);
   }
 
   async createResident(insertResident: InsertResident): Promise<Resident> {

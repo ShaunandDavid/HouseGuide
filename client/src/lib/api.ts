@@ -8,15 +8,13 @@ import type {
 const API_BASE = '/api';
 
 async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('auth-token');
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
-    credentials: 'include',
+    credentials: 'include', // Include httpOnly cookies automatically
   });
 
   if (!response.ok) {
@@ -28,16 +26,19 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
 }
 
 // Authentication
-export async function login(email: string, password: string): Promise<{ user: Guide; token: string }> {
+export async function login(email: string, password: string): Promise<{ user: Guide; success: boolean }> {
   return apiRequest('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
 }
 
-export function logout() {
-  // Clear any stored auth data
-  localStorage.removeItem('auth-token');
+export async function logout(): Promise<void> {
+  // Clear httpOnly auth cookie on server
+  await apiRequest('/auth/logout', {
+    method: 'POST',
+  });
+  // Clear any stored user data
   localStorage.removeItem('current-user');
 }
 
@@ -46,9 +47,8 @@ export function getCurrentUser(): Guide | null {
   return userStr ? JSON.parse(userStr) : null;
 }
 
-export function setCurrentUser(user: Guide, token: string) {
+export function setCurrentUser(user: Guide) {
   localStorage.setItem('current-user', JSON.stringify(user));
-  localStorage.setItem('auth-token', token);
 }
 
 // Houses

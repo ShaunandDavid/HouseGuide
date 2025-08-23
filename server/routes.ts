@@ -10,14 +10,9 @@ import {
 
 // Authentication middleware
 function requireAuth(req: any, res: any, next: any) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = req.cookies?.authToken;
+  if (!token || !token.startsWith('auth-')) {
     return res.status(401).json({ error: 'Authentication required' });
-  }
-  // Basic token validation - in production, verify JWT properly
-  const token = authHeader.slice(7);
-  if (!token.startsWith('auth-')) {
-    return res.status(401).json({ error: 'Invalid token' });
   }
   next();
 }
@@ -49,12 +44,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Remove password from response
       const { password: _, ...userWithoutPassword } = guide;
+      const token = `auth-${guide.id}-${Date.now()}`;
+      
+      // Set secure httpOnly cookie
+      res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      });
+      
       res.json({ 
         user: userWithoutPassword,
-        token: `auth-${guide.id}-${Date.now()}`
+        success: true
       });
     } catch (error) {
-      console.error('Login error:', error);
+      // Log without sensitive details in production
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Login error:', error);
+      }
       res.status(500).json({ error: "Authentication failed" });
     }
   });
@@ -78,27 +86,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Remove password from response
       const { password: _, ...userWithoutPassword } = guide;
+      const token = `auth-${guide.id}-${Date.now()}`;
+      
+      // Set secure httpOnly cookie
+      res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      });
+      
       res.status(201).json({ 
         user: userWithoutPassword,
-        token: `auth-${guide.id}-${Date.now()}`
+        success: true
       });
     } catch (error) {
-      console.error('Registration error:', error);
+      // Log without sensitive details in production
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Registration error:', error);
+      }
       res.status(500).json({ error: "Registration failed" });
     }
+  });
+
+  // Logout endpoint
+  app.post("/api/auth/logout", (req, res) => {
+    res.clearCookie('authToken');
+    res.json({ success: true });
   });
 
   // Houses endpoints (protected)
   app.get("/api/houses/:name", requireAuth, async (req, res) => {
     try {
       const { name } = req.params;
+      // Validate URL parameter
+      if (!name || name.length > 80) {
+        return res.status(400).json({ error: "Invalid house name" });
+      }
       const house = await storage.getHouseByName(name);
       if (!house) {
         return res.status(404).json({ error: "House not found" });
       }
       res.json(house);
     } catch (error) {
-      console.error('Get house error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Get house error:', error);
+      }
       res.status(500).json({ error: "Failed to fetch house" });
     }
   });
@@ -109,7 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const house = await storage.createHouse(validatedData);
       res.status(201).json(house);
     } catch (error) {
-      console.error('Create house error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Create house error:', error);
+      }
       res.status(500).json({ error: "Failed to create house" });
     }
   });
@@ -119,7 +154,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const houses = await storage.getAllHouses();
       res.json(houses);
     } catch (error) {
-      console.error('Get houses error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Get houses error:', error);
+      }
       res.status(500).json({ error: "Failed to fetch houses" });
     }
   });
@@ -128,24 +165,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/residents/by-house/:houseId", requireAuth, async (req, res) => {
     try {
       const { houseId } = req.params;
+      // Validate URL parameter
+      if (!houseId || houseId.length > 50) {
+        return res.status(400).json({ error: "Invalid house ID" });
+      }
       const residents = await storage.getResidentsByHouse(houseId);
       res.json(residents);
     } catch (error) {
-      console.error('Get residents by house error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Get residents by house error:', error);
+      }
       res.status(500).json({ error: "Failed to fetch residents" });
     }
   });
 
-  app.get("/api/residents/:id", async (req, res) => {
+  app.get("/api/residents/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      // Validate URL parameter
+      if (!id || id.length > 50) {
+        return res.status(400).json({ error: "Invalid resident ID" });
+      }
       const resident = await storage.getResident(id);
       if (!resident) {
         return res.status(404).json({ error: "Resident not found" });
       }
       res.json(resident);
     } catch (error) {
-      console.error('Get resident error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Get resident error:', error);
+      }
       res.status(500).json({ error: "Failed to fetch resident" });
     }
   });
@@ -156,7 +205,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resident = await storage.createResident(validatedData);
       res.status(201).json(resident);
     } catch (error) {
-      console.error('Create resident error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Create resident error:', error);
+      }
       res.status(500).json({ error: "Failed to create resident" });
     }
   });
@@ -168,7 +219,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resident = await storage.updateResident(id, validatedData);
       res.json(resident);
     } catch (error) {
-      console.error('Update resident error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Update resident error:', error);
+      }
       res.status(500).json({ error: "Failed to update resident" });
     }
   });
@@ -179,7 +232,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteResident(id);
       res.status(204).send();
     } catch (error) {
-      console.error('Delete resident error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Delete resident error:', error);
+      }
       res.status(500).json({ error: "Failed to delete resident" });
     }
   });
@@ -191,7 +246,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const file = await storage.createFile(validatedData);
       res.status(201).json(file);
     } catch (error) {
-      console.error('Create file error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Create file error:', error);
+      }
       res.status(500).json({ error: "Failed to create file" });
     }
   });
@@ -202,7 +259,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const files = await storage.getFilesByResident(residentId);
       res.json(files);
     } catch (error) {
-      console.error('Get files error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Get files error:', error);
+      }
       res.status(500).json({ error: "Failed to fetch files" });
     }
   });
@@ -213,7 +272,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteFile(id);
       res.status(204).send();
     } catch (error) {
-      console.error('Delete file error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Delete file error:', error);
+      }
       res.status(500).json({ error: "Failed to delete file" });
     }
   });
@@ -238,7 +299,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(report);
     } catch (error) {
-      console.error('Create/update report error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Create/update report error:', error);
+      }
       res.status(500).json({ error: "Failed to create/update report" });
     }
   });
@@ -249,7 +312,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const report = await storage.getReportByResidentAndWeek(residentId, weekStart);
       res.json(report);
     } catch (error) {
-      console.error('Get report error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Get report error:', error);
+      }
       res.status(500).json({ error: "Failed to fetch report" });
     }
   });

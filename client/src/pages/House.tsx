@@ -23,11 +23,17 @@ export default function House() {
 
   useEffect(() => {
     if (houseId) {
-      loadHouseData();
+      const controller = new AbortController();
+      loadHouseData(controller.signal);
+      
+      // Cleanup function to abort requests on unmount
+      return () => {
+        controller.abort();
+      };
     }
   }, [houseId]);
 
-  const loadHouseData = async () => {
+  const loadHouseData = async (signal?: AbortSignal) => {
     if (!houseId) return;
     
     setIsLoading(true);
