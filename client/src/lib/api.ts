@@ -78,6 +78,13 @@ export async function createResident(data: InsertResident): Promise<Resident> {
   });
 }
 
+export async function updateResident(id: string, data: Partial<InsertResident>): Promise<Resident> {
+  return apiRequest(`/residents/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 // Files
 export async function createFile(data: InsertFile): Promise<FileRecord> {
   return apiRequest('/files', {

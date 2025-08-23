@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Home, User, ChevronRight, Settings, UserPlus } from "lucide-react";
+import { Home, User, ChevronRight, Settings, UserPlus, Filter } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { House, Resident, FileRecord } from "@shared/schema";
@@ -18,6 +18,8 @@ export default function House() {
   const { houseId } = useParams<{ houseId: string }>();
   const [house, setHouse] = useState<House | null>(null);
   const [residents, setResidents] = useState<ResidentWithCounts[]>([]);
+  const [filteredResidents, setFilteredResidents] = useState<ResidentWithCounts[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'graduated'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -32,6 +34,15 @@ export default function House() {
       };
     }
   }, [houseId]);
+
+  useEffect(() => {
+    // Filter residents based on status filter
+    if (statusFilter === 'all') {
+      setFilteredResidents(residents);
+    } else {
+      setFilteredResidents(residents.filter(resident => (resident.status || 'active') === statusFilter));
+    }
+  }, [residents, statusFilter]);
 
   const loadHouseData = async (signal?: AbortSignal) => {
     if (!houseId) return;
@@ -70,6 +81,7 @@ export default function House() {
       );
       
       setResidents(residentsWithCounts);
+      setFilteredResidents(residentsWithCounts);
     } catch (error) {
       // Failed to load house data - handled in UI
       toast({
@@ -140,7 +152,62 @@ export default function House() {
           </Link>
         </div>
 
-        {residents.length === 0 ? (
+        {/* Status Filter */}
+        <div className="mb-4 flex items-center space-x-2">
+          <Filter className="w-4 h-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">Filter by status:</span>
+          <div className="flex space-x-2">
+            <Button
+              variant={statusFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter('all')}
+              data-testid="filter-all-residents"
+            >
+              All ({residents.length})
+            </Button>
+            <Button
+              variant={statusFilter === 'active' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter('active')}
+              className={statusFilter === 'active' ? 'bg-green-600 hover:bg-green-700' : 'text-green-700 border-green-300 hover:bg-green-50'}
+              data-testid="filter-active-residents"
+            >
+              Active ({residents.filter(r => (r.status || 'active') === 'active').length})
+            </Button>
+            <Button
+              variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter('inactive')}
+              className={statusFilter === 'inactive' ? 'bg-gray-600 hover:bg-gray-700' : 'text-gray-700 border-gray-300 hover:bg-gray-50'}
+              data-testid="filter-inactive-residents"
+            >
+              Inactive ({residents.filter(r => r.status === 'inactive').length})
+            </Button>
+            <Button
+              variant={statusFilter === 'graduated' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter('graduated')}
+              className={statusFilter === 'graduated' ? 'bg-blue-600 hover:bg-blue-700' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}
+              data-testid="filter-graduated-residents"
+            >
+              Graduated ({residents.filter(r => r.status === 'graduated').length})
+            </Button>
+          </div>
+        </div>
+
+        {filteredResidents.length === 0 && residents.length > 0 ? (
+          <Card data-testid="no-filtered-residents">
+            <CardContent className="pt-6 text-center">
+              <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-gray-900 mb-2">
+                No {statusFilter} residents
+              </h4>
+              <p className="text-gray-600">
+                No residents with status "{statusFilter}" found.
+              </p>
+            </CardContent>
+          </Card>
+        ) : residents.length === 0 ? (
           <Card data-testid="no-residents">
             <CardContent className="pt-6 text-center">
               <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -156,7 +223,7 @@ export default function House() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {residents.map((resident) => (
+            {filteredResidents.map((resident) => (
               <Link 
                 key={resident.id} 
                 href={`/resident/${resident.id}`}

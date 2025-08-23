@@ -44,6 +44,8 @@ export const insertResidentSchema = z.object({
   lastInitial: z.string().min(1).max(2),
   status: z.enum(["active", "inactive", "graduated"]).optional(),
   residentId: z.string().max(40).optional(),
+  dischargeDate: z.string().optional(), // ISO date string
+  dischargeReason: z.string().max(500).optional(),
 });
 
 export type InsertResident = z.infer<typeof insertResidentSchema>;
@@ -55,6 +57,8 @@ export interface Resident {
   lastInitial: string;
   status?: string;
   residentId?: string;
+  dischargeDate?: string; // ISO date string
+  dischargeReason?: string;
   created: string;
   updated: string;
 }

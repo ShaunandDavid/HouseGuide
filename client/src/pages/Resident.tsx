@@ -7,6 +7,7 @@ import { Loading } from "@/components/ui/loading";
 import { FileCard } from "@/components/ui/file-card";
 import { DocumentScanModal } from "@/components/DocumentScanModal";
 import { WeeklyReportModal } from "@/components/WeeklyReportModal";
+import { StatusManagementModal } from "@/components/StatusManagementModal";
 import { 
   ArrowLeft, 
   User, 
@@ -29,6 +30,7 @@ export default function ResidentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -128,15 +130,36 @@ export default function ResidentPage() {
               <User className="text-primary w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900" data-testid="resident-name">
-                {resident.firstName} {resident.lastInitial}.
-              </h2>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-lg font-semibold text-gray-900" data-testid="resident-name">
+                  {resident.firstName} {resident.lastInitial}.
+                </h2>
+                <Badge 
+                  variant={resident.status === 'active' ? 'default' : resident.status === 'graduated' ? 'secondary' : 'outline'}
+                  data-testid="resident-status"
+                >
+                  {resident.status || 'active'}
+                </Badge>
+              </div>
               <p className="text-sm text-gray-600" data-testid="resident-id">
                 {resident.residentId ? `ID: ${resident.residentId}` : 'No ID assigned'}
               </p>
+              {resident.dischargeDate && (
+                <p className="text-sm text-gray-500" data-testid="discharge-info">
+                  Discharged: {new Date(resident.dischargeDate).toLocaleDateString()}
+                  {resident.dischargeReason && ` - ${resident.dischargeReason}`}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex space-x-2">
+            <Button 
+              variant="outline"
+              onClick={() => setShowStatusModal(true)}
+              data-testid="manage-status-button"
+            >
+              Manage Status
+            </Button>
             <Button 
               variant="outline"
               onClick={() => setLocation(`/resident/${resident.id}/trackers`)}
@@ -271,6 +294,14 @@ export default function ResidentPage() {
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
         resident={resident}
+      />
+
+      {/* Status Management Modal */}
+      <StatusManagementModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        resident={resident}
+        onUpdate={loadResidentData}
       />
     </div>
   );
