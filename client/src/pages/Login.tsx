@@ -37,8 +37,8 @@ export default function Login() {
         title: "Welcome to HouseGuide",
         description: "Successfully signed in.",
       });
-      // Navigate to first available house or default
-      setLocation("/house/MAIN");
+      // Navigate to user's house
+      setLocation(`/house/${user.houseName}`);
     } catch (error) {
       // Authentication failed - handled in UI
       toast({
@@ -113,6 +113,17 @@ export default function Login() {
                 )}
               </Button>
             </form>
+            
+            <div className="mt-6 text-center">
+              <Button 
+                variant="ghost" 
+                onClick={() => setLocation("/register")}
+                className="text-sm text-gray-600 hover:text-gray-800"
+                data-testid="button-goto-register"
+              >
+                Need to set up your facility? Register Here
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import VerifyEmail from "@/pages/VerifyEmail";
 import House from "@/pages/House";
 import Resident from "@/pages/Resident";
 import TrackerDashboard from "@/pages/TrackerDashboard";
@@ -32,6 +34,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/house/:houseId" component={House} />
       <Route path="/resident/:id" component={Resident} />
       <Route path="/resident/:id/trackers" component={TrackerDashboard} />

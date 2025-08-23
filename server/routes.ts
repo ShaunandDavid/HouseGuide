@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { sendEmail, generateVerificationEmail } from "./email";
 import bcrypt from "bcrypt";
 import { 
   insertGuideSchema, insertHouseSchema, insertResidentSchema, insertFileSchema,
@@ -9,12 +10,31 @@ import {
 } from "@shared/schema";
 
 // Authentication middleware
-function requireAuth(req: any, res: any, next: any) {
+async function requireAuth(req: any, res: any, next: any) {
   const token = req.cookies?.authToken;
   if (!token || !token.startsWith('auth-')) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  next();
+  
+  // Extract guide ID from token
+  const guideParts = token.split('-');
+  if (guideParts.length < 2) {
+    return res.status(401).json({ error: 'Invalid authentication token' });
+  }
+  
+  const guideId = guideParts[1];
+  try {
+    const guide = await storage.getGuide(guideId);
+    if (!guide || !guide.isEmailVerified) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // Attach guide info to request for house-scoped access
+    req.guide = guide;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -35,6 +55,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const guide = await storage.getGuideByEmail(email);
       if (!guide) {
         return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Check if email is verified
+      if (!guide.isEmailVerified) {
+        return res.status(403).json({ 
+          error: "Please verify your email address before signing in. Check your email for the verification link.",
+          requiresVerification: true
+        });
       }
 
       const isValidPassword = await bcrypt.compare(password, guide.password);
@@ -84,21 +112,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword
       });
 
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = guide;
-      const token = `auth-${guide.id}-${Date.now()}`;
-      
-      // Set secure httpOnly cookie
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      });
-      
+      // Send verification email
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? `https://${req.headers.host}` 
+        : `http://${req.headers.host}`;
+        
+      if (guide.verificationToken) {
+        const emailParams = generateVerificationEmail(
+          guide.email, 
+          guide.verificationToken, 
+          guide.houseName,
+          baseUrl
+        );
+        
+        const emailSent = await sendEmail(emailParams);
+        if (!emailSent) {
+          console.error('Failed to send verification email');
+        }
+      }
+
       res.status(201).json({ 
-        user: userWithoutPassword,
-        success: true
+        message: "Registration successful! Please check your email to verify your account.",
+        success: true,
+        requiresVerification: true
       });
     } catch (error) {
       // Log without sensitive details in production
@@ -106,6 +142,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Registration error:', error);
       }
       res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // Email verification endpoint
+  app.get("/api/auth/verify-email", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: "Verification token is required" });
+      }
+
+      const guide = await storage.getGuideByVerificationToken(token);
+      if (!guide) {
+        return res.status(404).json({ error: "Invalid or expired verification token" });
+      }
+
+      if (guide.isEmailVerified) {
+        return res.json({ message: "Email already verified", success: true });
+      }
+
+      // Mark email as verified
+      await storage.updateGuide(guide.id, {
+        isEmailVerified: true,
+        verificationToken: undefined
+      });
+
+      res.json({ 
+        message: "Email verified successfully! You can now sign in to manage your facility.",
+        success: true 
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Email verification error:', error);
+      }
+      res.status(500).json({ error: "Verification failed" });
     }
   });
 

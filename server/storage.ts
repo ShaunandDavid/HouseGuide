@@ -10,7 +10,9 @@ export interface IStorage {
   // Guides
   getGuide(id: string): Promise<Guide | undefined>;
   getGuideByEmail(email: string): Promise<Guide | undefined>;
+  getGuideByVerificationToken(token: string): Promise<Guide | undefined>;
   createGuide(guide: InsertGuide): Promise<Guide>;
+  updateGuide(id: string, updates: Partial<Guide>): Promise<Guide>;
   
   // Houses
   getHouse(id: string): Promise<House | undefined>;
@@ -138,11 +140,36 @@ export class MemStorage implements IStorage {
     return Array.from(this.guides.values()).find(guide => guide.email === email);
   }
 
+  async getGuideByVerificationToken(token: string): Promise<Guide | undefined> {
+    return Array.from(this.guides.values()).find(guide => guide.verificationToken === token);
+  }
+
+  async updateGuide(id: string, updates: Partial<Guide>): Promise<Guide> {
+    const existing = this.guides.get(id);
+    if (!existing) throw new Error('Guide not found');
+    
+    const updated: Guide = {
+      ...existing,
+      ...updates,
+      updated: new Date().toISOString()
+    };
+    this.guides.set(id, updated);
+    return updated;
+  }
+
   async createGuide(insertGuide: InsertGuide): Promise<Guide> {
     const id = randomUUID();
+    const verificationToken = randomUUID();
+    
+    // Create the house first
+    const house = await this.createHouse({ name: insertGuide.houseName });
+    
     const guide: Guide = { 
-      ...insertGuide, 
-      id, 
+      ...insertGuide,
+      id,
+      houseId: house.id,
+      isEmailVerified: false,
+      verificationToken,
       created: new Date().toISOString(), 
       updated: new Date().toISOString() 
     };
@@ -184,6 +211,12 @@ export class MemStorage implements IStorage {
     return Array.from(this.residents.values())
       .filter(resident => resident.house === houseId)
       .slice(offset, offset + limit);
+  }
+
+  async getResidentsByGuideHouse(guideId: string): Promise<Resident[]> {
+    const guide = await this.getGuide(guideId);
+    if (!guide?.houseId) return [];
+    return this.getResidentsByHouse(guide.houseId);
   }
 
   async createResident(insertResident: InsertResident): Promise<Resident> {

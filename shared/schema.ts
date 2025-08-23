@@ -5,6 +5,7 @@ export const insertGuideSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1).max(120),
+  houseName: z.string().min(1).max(80),
 });
 
 export type InsertGuide = z.infer<typeof insertGuideSchema>;
@@ -14,6 +15,10 @@ export interface Guide {
   email: string;
   name: string;
   password: string;
+  houseName: string;
+  houseId?: string;
+  isEmailVerified: boolean;
+  verificationToken?: string;
   created: string;
   updated: string;
 }
