@@ -137,11 +137,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = guide;
       
-      // Always use cross-site cookie settings for frontend/backend separation
+      // Same-origin cookie settings (frontend and backend on same domain)
       const cookieOptions = {
         httpOnly: true,
-        secure: true,        // Always secure, even in dev
-        sameSite: "none" as const,     // Always none for cross-site
+        secure: true,
+        sameSite: "lax" as const,
         path: "/",
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
       };
