@@ -319,6 +319,7 @@ export const insertMeetingSchema = z.object({
   duration: z.number().min(0).optional(), // minutes
   location: z.string().max(200).optional(),
   notes: z.string().max(65536).optional(),
+  photoUrl: z.string().url().optional(), // Meeting attendance photo
   createdBy: z.string(),
 });
 
@@ -333,6 +334,7 @@ export interface Meeting {
   duration?: number; // minutes
   location?: string;
   notes?: string;
+  photoUrl?: string; // Meeting attendance photo
   createdBy: string;
   created: string;
   updated: string;
@@ -521,6 +523,7 @@ export const meetings = pgTable("meetings", {
   duration: integer("duration"),
   location: varchar("location", { length: 200 }),
   notes: text("notes"),
+  photoUrl: varchar("photo_url", { length: 500 }), // Meeting attendance photo
   createdBy: varchar("created_by").notNull(),
   created: timestamp("created").defaultNow().notNull(),
   updated: timestamp("updated").defaultNow().notNull(),

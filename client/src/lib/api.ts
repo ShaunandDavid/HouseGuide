@@ -10,7 +10,7 @@ import type {
 const API_BASE = "/api";
 
 // Helper function for making API requests
-async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+export async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   const url = `${API_BASE}${endpoint}`;
   
   const response = await fetch(url, {
