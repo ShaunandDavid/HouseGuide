@@ -1,56 +1,60 @@
-import type { 
-  Guide, House, Resident, FileRecord, Note, Report,
-  Goal, Checklist, Chore, Accomplishment, Incident, Meeting, ProgramFee,
-  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport,
-  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee
-} from '@shared/schema';
+// Configuration
+const API_BASE = "/api";
 
-const API_BASE = '/api';
-
-async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
+// Helper function for making API requests
+async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+  const url = `${API_BASE}${endpoint}`;
+  
+  const response = await fetch(url, {
     headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
+      "Content-Type": "application/json",
+      ...options.headers,
     },
-    credentials: 'include', // Include httpOnly cookies automatically
+    credentials: "include", // Include cookies for authentication
+    ...options,
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error: ${response.status} - ${error}`);
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
+
+  // Handle no-content responses
+  if (response.status === 204) {
+    return null;
   }
 
   return response.json();
 }
 
-// Authentication
-export async function login(email: string, password: string): Promise<{ user: Guide; success: boolean }> {
-  return apiRequest('/auth/login', {
-    method: 'POST',
+// Auth
+export async function login(email: string, password: string) {
+  return apiRequest("/auth/login", {
+    method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
-export async function logout(): Promise<void> {
-  // Clear httpOnly auth cookie on server
-  await apiRequest('/auth/logout', {
-    method: 'POST',
+export async function register(email: string, password: string, name: string, houseName: string) {
+  return apiRequest("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password, name, houseName }),
   });
-  // Clear any stored user data
-  localStorage.removeItem('current-user');
 }
 
-export function getCurrentUser(): Guide | null {
-  const userStr = localStorage.getItem('current-user');
-  try {
-    return userStr ? JSON.parse(userStr) : null;
-  } catch (error) {
-    // Clear corrupted user data and return null
-    localStorage.removeItem('current-user');
-    return null;
-  }
+export async function logout() {
+  return apiRequest("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export async function whoami() {
+  return apiRequest("/whoami");
+}
+
+export function getCurrentUser() {
+  const user = localStorage.getItem('current-user');
+  return user ? JSON.parse(user) : null;
 }
 
 export function setCurrentUser(user: Guide) {
@@ -290,3 +294,39 @@ export async function createNote(data: InsertNote): Promise<Note> {
 export async function getNotesByResident(residentId: string): Promise<Note[]> {
   return apiRequest(`/notes/by-resident/${residentId}`);
 }
+
+// Weekly Reports with AI
+export async function generateWeeklyReport(residentId: string, weekStart: string, weekEnd: string): Promise<{ draft: string; weekData: any }> {
+  return apiRequest('/reports/weekly/generate', {
+    method: 'POST',
+    body: JSON.stringify({ residentId, weekStart, weekEnd }),
+  });
+}
+
+export async function createWeeklyReport(data: InsertWeeklyReport): Promise<WeeklyReport> {
+  return apiRequest('/reports/weekly', {
+    method: 'POST', 
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getWeeklyReportsByResident(residentId: string, from?: string, to?: string): Promise<WeeklyReport[]> {
+  const params = new URLSearchParams();
+  if (from) params.append('from', from);
+  if (to) params.append('to', to);
+  
+  return apiRequest(`/reports/weekly/by-resident/${residentId}?${params.toString()}`);
+}
+
+export async function getAIStatus(): Promise<{ available: boolean; provider: string }> {
+  return apiRequest('/ai/status');
+}
+
+// Re-export types for convenience
+export type {
+  Guide, House, Resident, FileRecord, Report, Goal, Checklist, Chore, 
+  Accomplishment, Incident, Meeting, ProgramFee, Note, WeeklyReport,
+  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertReport,
+  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment,
+  InsertIncident, InsertMeeting, InsertProgramFee, InsertNote, InsertWeeklyReport
+} from "@shared/schema";

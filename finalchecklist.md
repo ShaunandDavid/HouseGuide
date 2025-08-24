@@ -36,13 +36,13 @@
 - [x] Mirror Checklist's persistence for Fees
 - [x] On save, create record with metadata: { id, residentId, houseId, createdBy, createdAt, data }
 
-### Notes & OCR
-- [ ] Open Note → create/save note in Notes
-- [ ] Scan Image functionality:
-  - [ ] Upload image to storage
-  - [ ] Run OCR (async)
-  - [ ] Save image in Pictures
-  - [ ] Save extracted text as linked Note in Notes (link back to image)
+### Notes & OCR ✅ COMPLETED
+- [x] Open Note → create/save note in Notes
+- [x] Scan Image functionality:
+  - [x] Upload image to storage
+  - [x] Run OCR (async)
+  - [x] Save image in Pictures
+  - [x] Save extracted text as linked Note in Notes (link back to image)
 
 ### Weekly Report (Template + AI Rewrite)
 - [ ] Keep manual entry functionality

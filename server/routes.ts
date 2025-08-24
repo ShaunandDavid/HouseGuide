@@ -10,6 +10,8 @@ import {
   insertAccomplishmentSchema, insertIncidentSchema, insertMeetingSchema, insertProgramFeeSchema, insertNoteSchema,
   insertWeeklyReportSchema
 } from "@shared/schema";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 // Authentication middleware
 async function requireAuth(req: any, res: any, next: any) {
@@ -902,15 +904,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!residentId || !weekStart || !weekEnd) {
         return res.status(400).json({ error: "residentId, weekStart, and weekEnd are required" });
       }
+
+      // Get resident and house info
+      const resident = await storage.getResident(residentId);
+      if (!resident) {
+        return res.status(404).json({ error: "Resident not found" });
+      }
+
+      const house = await storage.getHouse(resident.house);
+      if (!house) {
+        return res.status(404).json({ error: "House not found" });
+      }
+
+      // Collect all data for the week
+      const [goals, chores, accomplishments, incidents, meetings, programFees, notes] = await Promise.all([
+        storage.getGoalsByResident(residentId),
+        storage.getChoresByResident(residentId),
+        storage.getAccomplishmentsByResident(residentId),
+        storage.getIncidentsByResident(residentId),
+        storage.getMeetingsByResident(residentId),
+        storage.getProgramFeesByResident(residentId),
+        storage.getNotesByResident(residentId)
+      ]);
+
+      // Filter data to the specified week (basic implementation)
+      const weekStartDate = new Date(weekStart);
+      const weekEndDate = new Date(weekEnd);
       
-      // TODO: Implement AI report generation
-      // For now, return a placeholder draft
-      const draft = `# Weekly Report\n\n**Resident:** ${residentId}\n**Week:** ${weekStart} to ${weekEnd}\n\n## Summary\nNo updates this week.\n\n## Goals\nNo updates this week.\n\n## Incidents\nNo updates this week.\n\n## Meetings\nNo updates this week.\n\n## Chores\nNo updates this week.\n\n## Accomplishments\nNo updates this week.\n\n## Notes\nNo updates this week.`;
+      const filterByWeek = (items: any[], dateField: string) => {
+        return items.filter(item => {
+          const itemDate = new Date(item[dateField] || item.created);
+          return itemDate >= weekStartDate && itemDate <= weekEndDate;
+        });
+      };
+
+      const weekData = {
+        resident: {
+          id: resident.id,
+          firstName: resident.firstName,
+          lastInitial: resident.lastInitial
+        },
+        house: {
+          id: house.id,
+          name: house.name
+        },
+        period: {
+          weekStart,
+          weekEnd
+        },
+        data: {
+          goals: filterByWeek(goals, 'created'),
+          chores: filterByWeek(chores, 'assignedDate'),
+          accomplishments: filterByWeek(accomplishments, 'dateAchieved'),
+          incidents: filterByWeek(incidents, 'dateOccurred'),
+          meetings: filterByWeek(meetings, 'dateAttended'),
+          programFees: filterByWeek(programFees, 'dueDate'),
+          notes: filterByWeek(notes, 'created')
+        }
+      };
+
+      // Try AI generation, fallback to template if not available
+      let draft;
+      try {
+        // Lazy load AI service to avoid startup errors
+        const { aiService } = await import('./ai/index');
+        
+        // Load the report template
+        const templatePath = process.env.WEEKLY_REPORT_TEMPLATE_PATH || join(__dirname, 'templates', 'weeklyReport.md');
+        const template = readFileSync(templatePath, 'utf-8');
+
+        // Generate report with AI
+        draft = await aiService.generateWeeklyReport(weekData, template);
+      } catch (aiError) {
+        console.log('AI generation failed, using template fallback:', aiError);
+        // Fallback to basic template
+        draft = `# Weekly Progress Report
+
+**Resident:** ${resident.firstName} ${resident.lastInitial}
+**Facility:** ${house.name}
+**Report Period:** ${weekStart} to ${weekEnd}
+
+## Goals & Objectives
+${weekData.data.goals.length > 0 ? weekData.data.goals.map(g => `- ${g.title} (${g.status})`).join('\n') : 'No updates this week'}
+
+## Work & Professional Development
+No updates this week
+
+## House Responsibilities & Chores
+${weekData.data.chores.length > 0 ? weekData.data.chores.map(c => `- ${c.choreName} (${c.status})`).join('\n') : 'No updates this week'}
+
+## Demeanor & Behavior
+${weekData.data.incidents.length > 0 ? weekData.data.incidents.map(i => `- ${i.incidentType} incident (${i.severity})`).join('\n') : 'No incidents this week'}
+
+## Recovery & Personal Development
+${weekData.data.meetings.length > 0 ? weekData.data.meetings.map(m => `- ${m.meetingType} meeting attended`).join('\n') : 'No meetings this week'}
+
+## Financial Responsibilities
+${weekData.data.programFees.length > 0 ? weekData.data.programFees.map(f => `- $${f.amount} ${f.feeType} (${f.status})`).join('\n') : 'No updates this week'}
+
+## Notes
+${weekData.data.notes.length > 0 ? weekData.data.notes.map(n => `- ${n.text.substring(0, 100)}...`).join('\n') : 'No updates this week'}`;
+      }
       
-      res.json({ draft });
+      res.json({ draft, weekData });
     } catch (error) {
       console.error('Generate weekly report error:', error);
-      res.status(500).json({ error: "Failed to generate weekly report" });
+      res.status(500).json({ 
+        error: "Failed to generate weekly report", 
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Check AI provider status
+  app.get("/api/ai/status", requireAuth, async (req: any, res) => {
+    try {
+      // Lazy load AI service to avoid startup errors
+      const { aiService } = await import('./ai/index');
+      const isAvailable = await aiService.isProviderAvailable();
+      res.json({ 
+        available: isAvailable, 
+        provider: process.env.AI_PROVIDER || 'openai'
+      });
+    } catch (error) {
+      console.error('AI status check error:', error);
+      res.json({ available: false, provider: 'none' });
     }
   });
 

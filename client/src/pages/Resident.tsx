@@ -7,6 +7,7 @@ import { Loading } from "@/components/ui/loading";
 import { FileCard } from "@/components/ui/file-card";
 import { DocumentScanModal } from "@/components/DocumentScanModal";
 import { WeeklyReportModal } from "@/components/WeeklyReportModal";
+import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
 import { StatusManagementModal } from "@/components/StatusManagementModal";
 import { 
   ArrowLeft, 
@@ -14,7 +15,8 @@ import {
   Camera, 
   FileText, 
   Users, 
-  AlertTriangle 
+  AlertTriangle,
+  Wand2
 } from "lucide-react";
 import { getResident, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +32,7 @@ export default function ResidentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showReportEditor, setShowReportEditor] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const { toast } = useToast();
 
@@ -180,6 +183,14 @@ export default function ResidentPage() {
             >
               Generate Report
             </Button>
+            <Button 
+              onClick={() => setShowReportEditor(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              data-testid="ai-report-button"
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              AI Report
+            </Button>
           </div>
         </div>
       </header>
@@ -311,6 +322,23 @@ export default function ResidentPage() {
         resident={resident}
         onUpdate={loadResidentData}
       />
+
+      {/* AI Weekly Report Editor */}
+      {showReportEditor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-semibold">AI Weekly Report Generator</h2>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <WeeklyReportEditor
+                resident={resident}
+                onClose={() => setShowReportEditor(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
