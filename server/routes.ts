@@ -1106,7 +1106,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Lazy load AI service to avoid startup errors
         const { aiService } = await import('./ai/index');
         
-        // Load the report template
+        // Load the report template using ES modules compatible path
+        const { dirname } = await import('path');
+        const { fileURLToPath } = await import('url');
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        
         const templatePath = process.env.WEEKLY_REPORT_TEMPLATE_PATH || join(__dirname, 'templates', 'weeklyReport.md');
         const template = readFileSync(templatePath, 'utf-8');
 
@@ -1119,7 +1124,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sponsorInfo = weekData.data.meetings.length > 0 ? weekData.data.meetings.map(m => m.meetingType).join(', ') : 'No updates this week';
         const workInfo = weekData.data.goals.length > 0 ? weekData.data.goals.map(g => `${g.title} (${g.status})`).join(', ') : 'No updates this week';
         const choresInfo = weekData.data.chores.length > 0 ? weekData.data.chores.map(c => `${c.choreName} (${c.status})`).join(', ') : 'No updates this week';
-        const demeanorInfo = weekData.data.incidents.length > 0 ? weekData.data.incidents.map(i => `${i.incidentType} incident (${i.severity})`).join(', ') : 'No incidents this week';
+        // Include both incidents AND notes for demeanor - notes often contain social/behavioral observations
+        const demeanorItems = [];
+        if (weekData.data.incidents.length > 0) {
+          demeanorItems.push(...weekData.data.incidents.map(i => `${i.incidentType} incident (${i.severity})`));
+        }
+        if (weekData.data.notes.length > 0) {
+          demeanorItems.push(...weekData.data.notes.map(n => n.text.substring(0, 100) + (n.text.length > 100 ? '...' : '')));
+        }
+        const demeanorInfo = demeanorItems.length > 0 ? demeanorItems.join(', ') : 'No incidents or behavioral notes this week';
         const professionalInfo = weekData.data.accomplishments.length > 0 ? weekData.data.accomplishments.map(a => a.title).join(', ') : 'No updates this week';
         
         draft = `Resident: ${resident.firstName} ${resident.lastInitial}.  Week of: ${weekStart}

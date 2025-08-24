@@ -1,11 +1,11 @@
 Resident: {{residentName}}  Week of: {{weekStart}}
 
-__Sponsor/Mentor:__ [Content about sponsor relationships, mentorship activities, step work progress, and recovery program participation]
+__Sponsor/Mentor:__ {{sponsorInfo}}
 
-__Work/School:__ [Content about employment status, work performance, school attendance, and professional development]
+__Work/School:__ {{workInfo}}
 
-__Chores/Compliance:__ [Content about house chore completion, compliance with rules, and general responsibility]
+__Chores/Compliance:__ {{choresInfo}}
 
-__Demeanor / Participation:__ [Content about behavior, attitude, peer interactions, staff interactions, and program participation]
+__Demeanor / Participation:__ {{demeanorInfo}}
 
-__Professional Help / Appointments:__ [Content about counseling, therapy, medical appointments, and other professional services]
+__Professional Help / Appointments:__ {{professionalInfo}}
