@@ -8,6 +8,7 @@ import { Loading } from "@/components/ui/loading";
 import { Home, User, ChevronRight, Settings, UserPlus, Filter } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { House, Resident, FileRecord } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -19,7 +20,7 @@ interface ResidentWithCounts extends Resident {
 
 export default function House() {
   const [, setLocation] = useLocation();
-  const currentUser = getCurrentUser();
+  const { user: currentUser, isAuthenticated, isLoading: authLoading } = useAuth(true);
   const houseId = currentUser?.houseId;
   const [house, setHouse] = useState<House | null>(null);
   const [residents, setResidents] = useState<ResidentWithCounts[]>([]);
@@ -109,12 +110,17 @@ export default function House() {
     }
   };
 
-  if (isLoadingPage) { // Use the renamed isLoadingPage state
+  if (authLoading || isLoadingPage) { // Include auth loading check
     return (
       <div className="min-h-screen flex items-center justify-center" data-testid="house-loading">
         <Loading size="lg" />
       </div>
     );
+  }
+
+  // If not authenticated, useAuth hook will redirect to login
+  if (!isAuthenticated || !currentUser) {
+    return null; // Will be redirected by useAuth hook
   }
 
   if (error) {

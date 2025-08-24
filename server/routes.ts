@@ -282,6 +282,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
+  // Development-only endpoint to verify users manually
+  if (process.env.NODE_ENV === 'development') {
+    app.post("/api/auth/dev-verify", async (req, res) => {
+      try {
+        const { email } = req.body;
+        
+        if (!email) {
+          return res.status(400).json({ error: "Email is required" });
+        }
+
+        const guide = await storage.getGuideByEmail(email);
+        if (!guide) {
+          return res.status(404).json({ error: "User not found" });
+        }
+
+        // Mark email as verified
+        await storage.updateGuide(guide.id, {
+          isEmailVerified: true,
+          verificationToken: undefined
+        });
+        
+        console.log(`DEV-VERIFY: Email verified for: ${guide.email}`);
+
+        res.json({ 
+          message: "User verified successfully!",
+          success: true 
+        });
+      } catch (error) {
+        console.error('DEV-VERIFY: ERROR -', error);
+        res.status(500).json({ error: "Verification failed" });
+      }
+    });
+  }
+
   // Houses endpoints (protected)
   app.get("/api/houses/:idOrName", requireAuth, async (req, res) => {
     try {
