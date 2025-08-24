@@ -9,6 +9,7 @@ import { classifyDocumentByKeywords } from "@/lib/classify";
 import { uploadFile, createNote } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/api";
+import { autoPopulateTrackers } from "@/lib/auto-populate";
 
 interface DocumentScanModalProps {
   isOpen: boolean;
@@ -113,6 +114,15 @@ export function DocumentScanModal({
           linkedFileId: fileRecord.id,
           createdBy: currentUser.id
         });
+        
+        // Auto-populate trackers from OCR text
+        const populateResult = await autoPopulateTrackers(ocrResult, residentId, houseId, currentUser.id);
+        if (populateResult.created > 0) {
+          toast({
+            title: "Auto-populated Trackers",
+            description: `Created ${populateResult.created} tracker entries from scanned document`,
+          });
+        }
       }
       
       toast({

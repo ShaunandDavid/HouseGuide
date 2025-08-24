@@ -1258,8 +1258,8 @@ __Professional Help / Appointments:__ ${professionalInfo}`
         return sum + unpaidFees.reduce((feeSum, fee) => feeSum + (fee.amount || 0), 0);
       }, 0);
 
-      // Simple concatenated format as requested - just resident reports separated by spaces
-      const comprehensiveReport = residentReports.map(r => r.report).join(' ');
+      // Properly formatted report with clear separation between residents
+      const comprehensiveReport = residentReports.map(r => r.report).join('\n\n' + '='.repeat(80) + '\n\n');
       
       res.json({ 
         comprehensiveReport,
