@@ -74,7 +74,7 @@ export class DbStorage implements IStorage {
     } as Guide;
   }
 
-  async updateGuide(id: string, updates: Partial<Guide>): Promise<Guide> {
+  async updateGuide(id: string, updates: Partial<InsertGuide>): Promise<Guide> {
     const result = await db.update(guides)
       .set({
         ...updates,
