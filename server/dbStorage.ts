@@ -148,7 +148,7 @@ export class DbStorage implements IStorage {
       firstName: (resident as any).first_name || resident.firstName,
       lastInitial: (resident as any).last_initial || resident.lastInitial,
       status: resident.status,
-      residentId: (resident as any).resident_id || resident.residentId,
+
       dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
       dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
@@ -168,7 +168,7 @@ export class DbStorage implements IStorage {
       firstName: (resident as any).first_name || resident.firstName,
       lastInitial: (resident as any).last_initial || resident.lastInitial,
       status: resident.status,
-      residentId: (resident as any).resident_id || resident.residentId,
+
       dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
       dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
@@ -185,7 +185,7 @@ export class DbStorage implements IStorage {
       firstName: (resident as any).first_name || resident.firstName,
       lastInitial: (resident as any).last_initial || resident.lastInitial,
       status: resident.status,
-      residentId: (resident as any).resident_id || resident.residentId,
+
       dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
       dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
@@ -210,7 +210,7 @@ export class DbStorage implements IStorage {
       firstName: (resident as any).first_name || resident.firstName,
       lastInitial: (resident as any).last_initial || resident.lastInitial,
       status: resident.status,
-      residentId: (resident as any).resident_id || resident.residentId,
+
       dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
       dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
@@ -235,7 +235,7 @@ export class DbStorage implements IStorage {
   }
 
   async getFilesByResident(residentId: string): Promise<FileRecord[]> {
-    const result = await db.select().from(files).where(eq(files.residentId, residentId));
+    const result = await db.select().from(files).where(eq((files as any).resident_id, residentId));
     return result.map(file => ({
       ...file,
       created: file.created.toISOString(),

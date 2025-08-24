@@ -19,7 +19,7 @@ export default function OnboardResident() {
     firstName: "",
     lastInitial: "",
     status: "active" as "active" | "inactive" | "graduated",
-    residentId: ""
+
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -87,7 +87,7 @@ export default function OnboardResident() {
       firstName: "",
       lastInitial: "",
       status: "active",
-      residentId: ""
+  
     });
     setNewResidentName("");
   };
@@ -224,20 +224,6 @@ export default function OnboardResident() {
                   </Select>
                 </div>
 
-                <div>
-                  <Label htmlFor="residentId" className="block text-sm font-medium text-gray-700 mb-2">
-                    Resident ID (Optional)
-                  </Label>
-                  <Input
-                    id="residentId"
-                    type="text"
-                    value={formData.residentId}
-                    onChange={(e) => handleInputChange('residentId', e.target.value)}
-                    placeholder="Enter resident ID"
-                    disabled={isLoading}
-                    data-testid="input-resident-id"
-                  />
-                </div>
               </div>
 
               <Alert>

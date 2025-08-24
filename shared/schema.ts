@@ -45,7 +45,6 @@ export const insertResidentSchema = z.object({
   firstName: z.string().min(1).max(60),
   lastInitial: z.string().min(1).max(2),
   status: z.enum(["active", "inactive", "graduated"]).optional(),
-  residentId: z.string().max(40).optional(),
   dischargeDate: z.string().optional(), // ISO date string
   dischargeReason: z.string().max(500).optional(),
 });
@@ -58,7 +57,6 @@ export interface Resident {
   firstName: string;
   lastInitial: string;
   status?: string;
-  residentId?: string;
   dischargeDate?: string; // ISO date string
   dischargeReason?: string;
   created: string;
@@ -397,7 +395,6 @@ export const residents = pgTable("residents", {
   firstName: varchar("first_name", { length: 60 }).notNull(),
   lastInitial: varchar("last_initial", { length: 2 }).notNull(),
   status: varchar("status", { length: 20 }).default("active"),
-  residentId: varchar("resident_id", { length: 40 }),
   dischargeDate: varchar("discharge_date"),
   dischargeReason: varchar("discharge_reason", { length: 500 }),
   created: timestamp("created").defaultNow().notNull(),

@@ -142,9 +142,6 @@ export default function ResidentPage() {
                   {resident.status || 'active'}
                 </Badge>
               </div>
-              <p className="text-sm text-gray-600" data-testid="resident-id">
-                {resident.residentId ? `ID: ${resident.residentId}` : 'No ID assigned'}
-              </p>
               {resident.dischargeDate && (
                 <p className="text-sm text-gray-500" data-testid="discharge-info">
                   Discharged: {new Date(resident.dischargeDate).toLocaleDateString()}
