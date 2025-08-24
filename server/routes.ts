@@ -1121,31 +1121,8 @@ __Professional Help / Appointments:__ ${professionalInfo}`
         return sum + unpaidFees.reduce((feeSum, fee) => feeSum + (fee.amount || 0), 0);
       }, 0);
 
-      const comprehensiveReport = `# COMPREHENSIVE HOUSE REPORT
-**Facility:** ${house.name}
-**Report Period:** ${weekStart} to ${weekEnd}
-**Report Generated:** ${new Date().toLocaleDateString()}
-**Total Active Residents:** ${totalResidents}
-
----
-
-## HOUSE SUMMARY
-- **Total Incidents This Week:** ${totalIncidents}
-- **Total Meetings Attended:** ${totalMeetings}
-- **Total Accomplishments:** ${totalAccomplishments}
-- **Outstanding Program Fees:** $${outstandingFees.toFixed(2)}
-
----
-
-## INDIVIDUAL RESIDENT REPORTS
-
-${residentReports.map(r => r.report).join('\n\n---\n\n')}
-
----
-
-**Report Prepared By:** ${req.guide.name}
-**Date:** ${new Date().toLocaleDateString()}
-**Next Report Due:** ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}`;
+      // Simple concatenated format as requested - just resident reports separated by spaces
+      const comprehensiveReport = residentReports.map(r => r.report).join(' ');
       
       res.json({ 
         comprehensiveReport,

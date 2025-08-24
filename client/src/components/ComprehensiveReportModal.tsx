@@ -264,8 +264,8 @@ export function ComprehensiveReportModal({ isOpen, onClose }: ComprehensiveRepor
                 <Alert className="mb-4">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    This report includes individual reports for all {reportData.totalResidents} active residents 
-                    using your standard template format. Copy the text below to send to your director.
+                    Simple concatenated format: All {reportData.totalResidents} active residents in your standard template format. 
+                    Ready to copy and paste for your director.
                   </AlertDescription>
                 </Alert>
                 
