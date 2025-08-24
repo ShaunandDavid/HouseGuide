@@ -29,7 +29,7 @@ export class DbStorage implements IStorage {
   }
 
   async getGuideByEmail(email: string): Promise<Guide | undefined> {
-    const result = await db.select().from(guides).where(eq(guides.email, email)).limit(1);
+    const result = await db.select().from(guides).where(eq(guides.email, email.toLowerCase())).limit(1);
     if (result.length === 0) return undefined;
     const guide = result[0];
     return {
@@ -57,7 +57,7 @@ export class DbStorage implements IStorage {
     const house = await this.createHouse({ name: insertGuide.houseName });
     
     const result = await db.insert(guides).values({
-      email: insertGuide.email,
+      email: insertGuide.email.toLowerCase(),
       name: insertGuide.name,
       password: insertGuide.password,
       houseName: insertGuide.houseName,

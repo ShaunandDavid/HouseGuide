@@ -98,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email and password are required" });
       }
 
-      const guide = await storage.getGuideByEmail(email);
+      const guide = await storage.getGuideByEmail(email.toLowerCase());
       if (!guide) {
         console.error(`LOGIN: NOT_FOUND - User not found: ${email}`);
         return res.status(401).json({ error: "NOT_FOUND: Invalid credentials" });
