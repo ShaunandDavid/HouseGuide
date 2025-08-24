@@ -59,15 +59,14 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
   const handleCreateNote = async () => {
     if (!newNoteText.trim()) return;
 
-    const noteData: InsertNote = {
+    const noteData = {
       residentId,
-      houseId,
       text: newNoteText.trim(),
-      source: "manual",
-      createdBy: "current-user", // This will be set by the backend from auth
+      source: "manual" as const,
+      // houseId and createdBy will be set by the backend from auth
     };
 
-    createNoteMutation.mutate(noteData);
+    createNoteMutation.mutate(noteData as InsertNote);
   };
 
   const handleCancelCreate = () => {
