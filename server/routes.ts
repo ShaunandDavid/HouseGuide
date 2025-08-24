@@ -1024,6 +1024,152 @@ __Professional Help / Appointments:__ ${professionalInfo}`;
     }
   });
 
+  // Generate comprehensive house report for director
+  app.post("/api/reports/house/comprehensive", requireAuth, async (req: any, res) => {
+    try {
+      const { weekStart, weekEnd } = req.body;
+      
+      if (!weekStart || !weekEnd) {
+        return res.status(400).json({ error: "weekStart and weekEnd are required" });
+      }
+
+      const houseId = req.guide.houseId;
+      if (!houseId) {
+        return res.status(400).json({ error: "Guide must be associated with a house" });
+      }
+
+      // Get house info
+      const house = await storage.getHouse(houseId);
+      if (!house) {
+        return res.status(404).json({ error: "House not found" });
+      }
+
+      // Get all residents in the house
+      const residents = await storage.getResidentsByHouse(houseId);
+      if (residents.length === 0) {
+        return res.status(404).json({ error: "No residents found in house" });
+      }
+
+      // Filter to active residents only
+      const activeResidents = residents.filter(r => r.status === 'active');
+
+      const weekStartDate = new Date(weekStart);
+      const weekEndDate = new Date(weekEnd);
+      
+      const filterByWeek = (items: any[], dateField: string) => {
+        return items.filter(item => {
+          const itemDate = new Date(item[dateField] || item.created);
+          return itemDate >= weekStartDate && itemDate <= weekEndDate;
+        });
+      };
+
+      // Collect comprehensive data for all residents
+      const residentReports = await Promise.all(
+        activeResidents.map(async (resident) => {
+          const [goals, chores, accomplishments, incidents, meetings, programFees, notes] = await Promise.all([
+            storage.getGoalsByResident(resident.id),
+            storage.getChoresByResident(resident.id),
+            storage.getAccomplishmentsByResident(resident.id),
+            storage.getIncidentsByResident(resident.id),
+            storage.getMeetingsByResident(resident.id),
+            storage.getProgramFeesByResident(resident.id),
+            storage.getNotesByResident(resident.id)
+          ]);
+
+          const weekData = {
+            goals: filterByWeek(goals, 'created'),
+            chores: filterByWeek(chores, 'assignedDate'),
+            accomplishments: filterByWeek(accomplishments, 'dateAchieved'),
+            incidents: filterByWeek(incidents, 'dateOccurred'),
+            meetings: filterByWeek(meetings, 'dateAttended'),
+            programFees: filterByWeek(programFees, 'dueDate'),
+            notes: filterByWeek(notes, 'created')
+          };
+
+          // Generate individual report using template format
+          const sponsorInfo = weekData.meetings.length > 0 ? weekData.meetings.map(m => m.meetingType).join(', ') : 'No updates this week';
+          const workInfo = weekData.goals.length > 0 ? weekData.goals.map(g => `${g.title} (${g.status})`).join(', ') : 'No updates this week';
+          const choresInfo = weekData.chores.length > 0 ? weekData.chores.map(c => `${c.choreName} (${c.status})`).join(', ') : 'No updates this week';
+          const demeanorInfo = weekData.incidents.length > 0 ? weekData.incidents.map(i => `${i.incidentType} incident (${i.severity})`).join(', ') : 'No incidents this week';
+          const professionalInfo = weekData.accomplishments.length > 0 ? weekData.accomplishments.map(a => a.title).join(', ') : 'No updates this week';
+          
+          return {
+            resident,
+            weekData,
+            report: `Resident: ${resident.firstName} ${resident.lastInitial}.  Week of: ${weekStart}
+
+__Sponsor/Mentor:__ ${sponsorInfo}
+
+__Work/School:__ ${workInfo}
+
+__Chores/Compliance:__ ${choresInfo}
+
+__Demeanor / Participation:__ ${demeanorInfo}
+
+__Professional Help / Appointments:__ ${professionalInfo}`
+          };
+        })
+      );
+
+      // Generate comprehensive house summary
+      const totalResidents = activeResidents.length;
+      const totalIncidents = residentReports.reduce((sum, r) => sum + r.weekData.incidents.length, 0);
+      const totalMeetings = residentReports.reduce((sum, r) => sum + r.weekData.meetings.length, 0);
+      const totalAccomplishments = residentReports.reduce((sum, r) => sum + r.weekData.accomplishments.length, 0);
+      const outstandingFees = residentReports.reduce((sum, r) => {
+        const unpaidFees = r.weekData.programFees.filter(f => f.status !== 'paid');
+        return sum + unpaidFees.reduce((feeSum, fee) => feeSum + (fee.amount || 0), 0);
+      }, 0);
+
+      const comprehensiveReport = `# COMPREHENSIVE HOUSE REPORT
+**Facility:** ${house.name}
+**Report Period:** ${weekStart} to ${weekEnd}
+**Report Generated:** ${new Date().toLocaleDateString()}
+**Total Active Residents:** ${totalResidents}
+
+---
+
+## HOUSE SUMMARY
+- **Total Incidents This Week:** ${totalIncidents}
+- **Total Meetings Attended:** ${totalMeetings}
+- **Total Accomplishments:** ${totalAccomplishments}
+- **Outstanding Program Fees:** $${outstandingFees.toFixed(2)}
+
+---
+
+## INDIVIDUAL RESIDENT REPORTS
+
+${residentReports.map(r => r.report).join('\n\n---\n\n')}
+
+---
+
+**Report Prepared By:** ${req.guide.name}
+**Date:** ${new Date().toLocaleDateString()}
+**Next Report Due:** ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}`;
+      
+      res.json({ 
+        comprehensiveReport,
+        house,
+        totalResidents,
+        residentReports: residentReports.map(r => ({
+          resident: r.resident,
+          summary: {
+            incidents: r.weekData.incidents.length,
+            meetings: r.weekData.meetings.length,
+            accomplishments: r.weekData.accomplishments.length,
+            outstandingFees: r.weekData.programFees.filter(f => f.status !== 'paid').reduce((sum, fee) => sum + (fee.amount || 0), 0)
+          }
+        }))
+      });
+    } catch (error) {
+      console.error('Generate comprehensive house report error:', error);
+      res.status(500).json({ 
+        error: "Failed to generate comprehensive house report", 
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Error handling middleware
   app.use((err: any, req: any, res: any, next: any) => {
     if (res.headersSent) {

@@ -322,6 +322,27 @@ export async function getAIStatus(): Promise<{ available: boolean; provider: str
   return apiRequest('/ai/status');
 }
 
+// House comprehensive report
+export async function generateComprehensiveHouseReport(weekStart: string, weekEnd: string): Promise<{
+  comprehensiveReport: string;
+  house: House;
+  totalResidents: number;
+  residentReports: Array<{
+    resident: Resident;
+    summary: {
+      incidents: number;
+      meetings: number;
+      accomplishments: number;
+      outstandingFees: number;
+    };
+  }>;
+}> {
+  return apiRequest('/reports/house/comprehensive', {
+    method: 'POST',
+    body: JSON.stringify({ weekStart, weekEnd }),
+  });
+}
+
 // Re-export types for convenience
 export type {
   Guide, House, Resident, FileRecord, Report, Goal, Checklist, Chore, 

@@ -5,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Home, User, ChevronRight, Settings, UserPlus, Filter } from "lucide-react";
+import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
+import { ComprehensiveReportModal } from "@/components/ComprehensiveReportModal";
 import { useToast } from "@/hooks/use-toast";
 import type { House, Resident, FileRecord } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ export default function House() {
   const [filteredResidents, setFilteredResidents] = useState<ResidentWithCounts[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'graduated'>('all');
   const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict with useQuery's isLoading
+  const [showComprehensiveReport, setShowComprehensiveReport] = useState(false);
   const { toast } = useToast();
 
   const { isLoading, error } = useQuery({
@@ -204,12 +206,22 @@ export default function House() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Residents</h3>
             <p className="text-gray-600">Manage resident files and weekly reports</p>
           </div>
-          <Link href={`/dashboard/onboard`}>
-            <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-resident">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add New Resident
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowComprehensiveReport(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-comprehensive-report"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Director Report
             </Button>
-          </Link>
+            <Link href={`/dashboard/onboard`}>
+              <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-resident">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add New Resident
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Status Filter */}
@@ -330,6 +342,12 @@ export default function House() {
           </div>
         )}
       </main>
+
+      {/* Comprehensive Report Modal */}
+      <ComprehensiveReportModal
+        isOpen={showComprehensiveReport}
+        onClose={() => setShowComprehensiveReport(false)}
+      />
     </div>
   );
 }
