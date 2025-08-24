@@ -124,43 +124,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`LOGIN: House verified - ID: ${house.id}, Name: ${house.name}`);
 
       // Create JWT token
-      const jwtPayload = {
-        userId: guide.id,
-        email: guide.email,
-        houseId: guide.houseId
-      };
-      
-      const token = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
-        expiresIn: '24h'
-      });
-      
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = guide;
-      
-      // Same-origin cookie settings (frontend and backend on same domain)
-      const cookieOptions = {
+      const token = jwt.sign(
+        { userId: guide.id, email: guide.email, houseId: guide.houseId },
+        process.env.JWT_SECRET!, 
+        { expiresIn: "24h" }
+      );
+
+      // strip password
+      const { password: _pw, ...userWithoutPassword } = guide;
+
+      // ⬇⬇ Cross-site cookie: required when FRONTEND_URL != API origin
+      res.cookie("authToken", token, {
         httpOnly: true,
-        secure: true,
-        sameSite: "lax" as const,
+        secure: true,        // REQUIRED with SameSite=None
+        sameSite: "none",    // cross-origin
         path: "/",
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      };
-      
-      res.cookie('authToken', token, cookieOptions);
-      
-      console.log(`LOGIN: SUCCESS - User logged in: ${email}`);
-      console.log(`LOGIN: NODE_ENV=${process.env.NODE_ENV}`);
-      console.log(`LOGIN: Cookie settings:`, {
-        secure: cookieOptions.secure,
-        sameSite: cookieOptions.sameSite,
-        httpOnly: cookieOptions.httpOnly
+        maxAge: 24 * 60 * 60 * 1000
       });
-      
-      res.json({ 
-        user: userWithoutPassword,
-        success: true,
-// token: token  // Removed: was for testing only
-      });
+
+      // single JSON response (no duplicates below this)
+      return res.json({ success: true, user: userWithoutPassword });
     } catch (error) {
       console.error('LOGIN: ERROR -', error);
       res.status(500).json({ error: "Authentication failed" });
