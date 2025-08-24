@@ -14,7 +14,6 @@ import {
 async function requireAuth(req: any, res: any, next: any) {
   const token = req.cookies?.authToken;
   if (!token) {
-    console.error('AUTH: No token found in cookies');
     return res.status(401).json({ error: 'Authentication required' });
   }
   
@@ -59,6 +58,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Debug endpoint to test cookies
+  app.get("/api/whoami", requireAuth, (req: any, res) => {
+    res.json({ ok: true, user: req.guide?.email });
   });
 
   // Authentication endpoints
@@ -118,20 +122,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = guide;
       
-      // Set secure httpOnly cookie with deployment-friendly settings
+      // Fixed cookie settings for development and production
       const isProduction = process.env.NODE_ENV === 'production';
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      });
       
-      console.log(`LOGIN: SUCCESS - User logged in: ${email}, Cookie set with secure=${isProduction}, sameSite=${isProduction ? 'none' : 'lax'}`);
+      // Development: HTTP + lax cookies (working)
+      // Production: HTTPS + none cookies (cross-origin)
+      const cookieOptions: any = {
+        httpOnly: true,
+        secure: isProduction,       // Only secure in production (HTTPS)
+        sameSite: isProduction ? 'none' : 'lax',  // lax for dev, none for prod
+        path: '/',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      };
+      
+      res.cookie('authToken', token, cookieOptions);
+      
+      console.log(`LOGIN: SUCCESS - User logged in: ${email}`);
+      console.log(`LOGIN: NODE_ENV=${process.env.NODE_ENV}, isProduction=${isProduction}`);
+      console.log(`LOGIN: Cookie settings:`, {
+        secure: cookieOptions.secure,
+        sameSite: cookieOptions.sameSite,
+        httpOnly: cookieOptions.httpOnly
+      });
       
       res.json({ 
         user: userWithoutPassword,
-        success: true
+        success: true,
+// token: token  // Removed: was for testing only
       });
     } catch (error) {
       console.error('LOGIN: ERROR -', error);
