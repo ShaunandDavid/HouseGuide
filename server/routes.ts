@@ -140,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Same-origin cookie settings (frontend and backend on same domain)
       const cookieOptions = {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production', // Only secure in production
         sameSite: "lax" as const,
         path: "/",
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
