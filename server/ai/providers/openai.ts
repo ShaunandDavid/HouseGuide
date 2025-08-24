@@ -51,7 +51,7 @@ IMPORTANT:
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o", // Use the latest model as specified in the blueprint
+        model: "gpt-3.5-turbo", // Cost-effective model perfect for report generation
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
