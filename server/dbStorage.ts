@@ -143,7 +143,14 @@ export class DbStorage implements IStorage {
     if (result.length === 0) return undefined;
     const resident = result[0];
     return {
-      ...resident,
+      id: resident.id,
+      house: resident.house,
+      firstName: (resident as any).first_name || resident.firstName,
+      lastInitial: (resident as any).last_initial || resident.lastInitial,
+      status: resident.status,
+      residentId: (resident as any).resident_id || resident.residentId,
+      dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
+      dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
       updated: resident.updated.toISOString(),
     } as Resident;
@@ -156,7 +163,14 @@ export class DbStorage implements IStorage {
     
     const result = await query;
     return result.map(resident => ({
-      ...resident,
+      id: resident.id,
+      house: resident.house,
+      firstName: (resident as any).first_name || resident.firstName,
+      lastInitial: (resident as any).last_initial || resident.lastInitial,
+      status: resident.status,
+      residentId: (resident as any).resident_id || resident.residentId,
+      dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
+      dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
       updated: resident.updated.toISOString(),
     })) as Resident[];
@@ -166,7 +180,14 @@ export class DbStorage implements IStorage {
     const result = await db.insert(residents).values(insertResident).returning();
     const resident = result[0];
     return {
-      ...resident,
+      id: resident.id,
+      house: resident.house,
+      firstName: (resident as any).first_name || resident.firstName,
+      lastInitial: (resident as any).last_initial || resident.lastInitial,
+      status: resident.status,
+      residentId: (resident as any).resident_id || resident.residentId,
+      dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
+      dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
       updated: resident.updated.toISOString(),
     } as Resident;
@@ -184,7 +205,14 @@ export class DbStorage implements IStorage {
     if (result.length === 0) throw new Error('Resident not found');
     const resident = result[0];
     return {
-      ...resident,
+      id: resident.id,
+      house: resident.house,
+      firstName: (resident as any).first_name || resident.firstName,
+      lastInitial: (resident as any).last_initial || resident.lastInitial,
+      status: resident.status,
+      residentId: (resident as any).resident_id || resident.residentId,
+      dischargeDate: (resident as any).discharge_date || resident.dischargeDate,
+      dischargeReason: (resident as any).discharge_reason || resident.dischargeReason,
       created: resident.created.toISOString(),
       updated: resident.updated.toISOString(),
     } as Resident;
