@@ -273,7 +273,7 @@ export default function House() {
               <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">No Residents Added Yet</h4>
               <p className="text-gray-600 mb-4">Start by adding your first resident to the facility.</p>
-              <Link href={`/house/${houseId}/onboard`}>
+              <Link href={`/dashboard/onboard`}>
                 <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-first-resident">
                   <UserPlus className="w-4 h-4 mr-2" />
                   Add Your First Resident
