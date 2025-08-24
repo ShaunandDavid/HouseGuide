@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { getCurrentUser } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
