@@ -978,32 +978,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (aiError) {
         console.log('AI generation failed, using template fallback:', aiError);
         // Fallback to basic template
-        draft = `# Weekly Progress Report
+        // Use the original perfect template format
+        const sponsorInfo = weekData.data.meetings.length > 0 ? weekData.data.meetings.map(m => m.meetingType).join(', ') : 'No updates this week';
+        const workInfo = weekData.data.goals.length > 0 ? weekData.data.goals.map(g => `${g.title} (${g.status})`).join(', ') : 'No updates this week';
+        const choresInfo = weekData.data.chores.length > 0 ? weekData.data.chores.map(c => `${c.choreName} (${c.status})`).join(', ') : 'No updates this week';
+        const demeanorInfo = weekData.data.incidents.length > 0 ? weekData.data.incidents.map(i => `${i.incidentType} incident (${i.severity})`).join(', ') : 'No incidents this week';
+        const professionalInfo = weekData.data.accomplishments.length > 0 ? weekData.data.accomplishments.map(a => a.title).join(', ') : 'No updates this week';
+        
+        draft = `Resident: ${resident.firstName} ${resident.lastInitial}.  Week of: ${weekStart}
 
-**Resident:** ${resident.firstName} ${resident.lastInitial}
-**Facility:** ${house.name}
-**Report Period:** ${weekStart} to ${weekEnd}
+__Sponsor/Mentor:__ ${sponsorInfo}
 
-## Goals & Objectives
-${weekData.data.goals.length > 0 ? weekData.data.goals.map(g => `- ${g.title} (${g.status})`).join('\n') : 'No updates this week'}
+__Work/School:__ ${workInfo}
 
-## Work & Professional Development
-No updates this week
+__Chores/Compliance:__ ${choresInfo}
 
-## House Responsibilities & Chores
-${weekData.data.chores.length > 0 ? weekData.data.chores.map(c => `- ${c.choreName} (${c.status})`).join('\n') : 'No updates this week'}
+__Demeanor / Participation:__ ${demeanorInfo}
 
-## Demeanor & Behavior
-${weekData.data.incidents.length > 0 ? weekData.data.incidents.map(i => `- ${i.incidentType} incident (${i.severity})`).join('\n') : 'No incidents this week'}
-
-## Recovery & Personal Development
-${weekData.data.meetings.length > 0 ? weekData.data.meetings.map(m => `- ${m.meetingType} meeting attended`).join('\n') : 'No meetings this week'}
-
-## Financial Responsibilities
-${weekData.data.programFees.length > 0 ? weekData.data.programFees.map(f => `- $${f.amount} ${f.feeType} (${f.status})`).join('\n') : 'No updates this week'}
-
-## Notes
-${weekData.data.notes.length > 0 ? weekData.data.notes.map(n => `- ${n.text.substring(0, 100)}...`).join('\n') : 'No updates this week'}`;
+__Professional Help / Appointments:__ ${professionalInfo}`;
       }
       
       res.json({ draft, weekData });

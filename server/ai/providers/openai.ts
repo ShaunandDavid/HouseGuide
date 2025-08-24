@@ -23,25 +23,31 @@ export class OpenAIProvider implements AIProvider {
     const systemPrompt = `You are a professional residential care facility staff member writing weekly progress reports. 
 
 STRICT REQUIREMENTS:
-1. Follow the provided template structure EXACTLY
-2. Use professional, clinical language appropriate for facility documentation
+1. Follow the provided template structure EXACTLY - maintain the exact format with underscored section headers
+2. Use professional, clinical language appropriate for sober living facility documentation
 3. For empty sections, write "No updates this week" 
 4. Be factual and objective - only report on actual data provided
 5. Do not invent or hallucinate information
 6. Maintain resident confidentiality (use first name + last initial only)
-7. Focus on progress, challenges, and next steps
+7. Fill each section with relevant information from the provided data
+8. Keep the exact format: "Resident: [Name]  Week of: [Date]" followed by the five sections with underscored headers
 
-Return ONLY the completed report following the exact template structure.`;
+Return ONLY the completed report following the exact template structure with no additional formatting or headers.`;
 
-    const userPrompt = `Generate a weekly report for ${data.resident.firstName} ${data.resident.lastInitial} at ${data.house.name} for the week of ${data.period.weekStart} to ${data.period.weekEnd}.
+    const userPrompt = `Generate a weekly report for ${data.resident.firstName} ${data.resident.lastInitial} for the week of ${data.period.weekStart}.
 
-TEMPLATE TO FOLLOW:
+TEMPLATE TO FOLLOW EXACTLY:
 ${template}
 
 DATA AVAILABLE:
 ${this.formatDataForPrompt(data)}
 
-Remember: Follow the template structure exactly. Use "No updates this week" for any sections without data.`;
+IMPORTANT: 
+- Replace {{residentName}} with "${data.resident.firstName} ${data.resident.lastInitial}."
+- Replace {{weekStart}} with "${data.period.weekStart}"
+- Fill each section based on the data provided
+- Use "No updates this week" for sections without relevant data
+- Maintain the exact format and structure`;
 
     try {
       const response = await this.openai.chat.completions.create({
