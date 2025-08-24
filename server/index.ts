@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -108,6 +109,15 @@ app.use((req, res, next) => {
     await setupVite(app, server);
   } else {
     serveStatic(app);
+  }
+
+  // Serve React frontend in production
+  if (process.env.NODE_ENV === "production") {
+    const clientPath = path.join(import.meta.dirname, "..", "dist", "public");
+    app.use(express.static(clientPath));
+    app.get("*", (_, res) =>
+      res.sendFile(path.join(clientPath, "index.html"))
+    );
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
