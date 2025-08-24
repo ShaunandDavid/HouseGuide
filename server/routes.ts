@@ -137,23 +137,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = guide;
       
-      // Fixed cookie settings for development and production
-      const isProduction = process.env.NODE_ENV === 'production';
-      
-      // Development: HTTP + lax cookies (working)
-      // Production: HTTPS + none cookies (cross-origin)
-      const cookieOptions: any = {
+      // Always use cross-site cookie settings for frontend/backend separation
+      const cookieOptions = {
         httpOnly: true,
-        secure: isProduction,       // Only secure in production (HTTPS)
-        sameSite: isProduction ? 'none' : 'lax',  // lax for dev, none for prod
-        path: '/',
+        secure: true,        // Always secure, even in dev
+        sameSite: "none" as const,     // Always none for cross-site
+        path: "/",
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
       };
       
       res.cookie('authToken', token, cookieOptions);
       
       console.log(`LOGIN: SUCCESS - User logged in: ${email}`);
-      console.log(`LOGIN: NODE_ENV=${process.env.NODE_ENV}, isProduction=${isProduction}`);
+      console.log(`LOGIN: NODE_ENV=${process.env.NODE_ENV}`);
       console.log(`LOGIN: Cookie settings:`, {
         secure: cookieOptions.secure,
         sameSite: cookieOptions.sameSite,
