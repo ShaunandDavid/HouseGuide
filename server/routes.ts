@@ -670,11 +670,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/checklists", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertChecklistSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const checklistData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure checklist is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertChecklistSchema.parse(checklistData);
       
       // Check if checklist already exists for this resident
       const existingChecklist = await storage.getChecklistByResident(validatedData.residentId);
