@@ -156,9 +156,35 @@ app.use((req, res, next) => {
 
   // Serve React frontend in production
   if (process.env.NODE_ENV === "production") {
-    const clientPath = path.resolve(import.meta.dirname, "public");
-    app.use(express.static(clientPath));
+    const clientPath = path.resolve(import.meta.dirname, "dist/public");
+    
+    // Cache assets with immutable headers (hashed filenames)
+    app.use("/assets", express.static(path.join(clientPath, "assets"), {
+      maxAge: "1y",
+      immutable: true,
+      setHeaders: (res) => {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    }));
+    
+    // Serve other static files with short cache
+    app.use(express.static(clientPath, {
+      maxAge: "1h",
+      setHeaders: (res, filePath) => {
+        // Never cache index.html
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        }
+      }
+    }));
+    
+    // SPA fallback - always serve index.html with no-cache
     app.get("*", (_req, res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(clientPath, "index.html"));
     });
   }

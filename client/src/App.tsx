@@ -22,13 +22,29 @@ import NotFound from "@/pages/not-found";
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
+  navigator.serviceWorker.register('/sw.js', {
+    updateViaCache: 'none'  // Never cache the service worker file
+  })
     .then(registration => {
       console.log('SW registered: ', registration);
+      
+      // Check for updates periodically in development
+      if (process.env.NODE_ENV === 'development') {
+        setInterval(() => {
+          registration.update();
+        }, 60000); // Check every minute
+      }
     })
     .catch(registrationError => {
       console.log('SW registration failed: ', registrationError);
     });
+  
+  // Handle service worker updates
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!navigator.serviceWorker.controller?.scriptURL.includes('localhost')) {
+      window.location.reload();
+    }
+  });
 }
 
 function Router() {
