@@ -11,19 +11,19 @@
 
 ## Goals Implementation
 
-### Sidebar / Folder Structure (shadcn-style)
-- [ ] Add collapsible sidebar (left) on Client Dashboard with folders
-- [ ] Create Weekly Reports folder
-- [ ] Create Pictures folder
-- [ ] Create Notes folder (include OCR text from scanned images)
-- [ ] Create Trackers folder with subfolders:
-  - [ ] Goals
-  - [ ] Checklist
-  - [ ] Chores
-  - [ ] Accomplishments
-  - [ ] Incidents
-  - [ ] Meetings
-  - [ ] Fees
+### Sidebar / Folder Structure (shadcn-style) ✅ COMPLETED
+- [x] Add collapsible sidebar (left) on Client Dashboard with folders
+- [x] Create Weekly Reports folder
+- [x] Create Pictures folder
+- [x] Create Notes folder (include OCR text from scanned images)
+- [x] Create Trackers folder with subfolders:
+  - [x] Goals
+  - [x] Checklist
+  - [x] Chores
+  - [x] Accomplishments
+  - [x] Incidents
+  - [x] Meetings
+  - [x] Fees
 - [ ] Each folder lists entries (title + timestamp)
 - [ ] Click to view functionality for each entry
 
@@ -67,8 +67,8 @@
 ## Implementation Details
 
 ### Frontend Components
-- [ ] Create client/src/components/ResidentSidebar.tsx (shadcn/ui, collapsible)
-- [ ] Create client/src/pages/ResidentDashboard.tsx (wraps House/Resident views with sidebar)
+- [x] Create client/src/components/ResidentSidebar.tsx (shadcn/ui, collapsible)
+- [x] Create client/src/pages/ResidentDashboard.tsx (wraps House/Resident views with sidebar)
 - [ ] Create client/src/components/ReportEditor.tsx (markdown/textarea + "Generate with AI" + "Save")
 - [ ] Create client/src/components/MicInput.tsx (Web Speech API hook + button)
 - [ ] Update client/src/lib/api.ts (add new API helpers)

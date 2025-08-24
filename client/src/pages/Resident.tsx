@@ -168,6 +168,13 @@ export default function ResidentPage() {
               View Trackers
             </Button>
             <Button 
+              variant="default"
+              onClick={() => setLocation(`/resident/${resident.id}/dashboard`)}
+              data-testid="open-dashboard-button"
+            >
+              Open Dashboard
+            </Button>
+            <Button 
               onClick={() => setShowReportModal(true)}
               data-testid="generate-report-button"
             >

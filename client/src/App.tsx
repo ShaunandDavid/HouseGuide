@@ -10,6 +10,7 @@ import OnboardResident from "@/pages/OnboardResident";
 import House from "@/pages/House";
 import Resident from "@/pages/Resident";
 import TrackerDashboard from "@/pages/TrackerDashboard";
+import ResidentDashboard from "@/pages/ResidentDashboard";
 import GoalTracker from "@/pages/GoalTracker";
 import ChecklistTracker from "@/pages/ChecklistTracker";
 import ChoreTracker from "@/pages/ChoreTracker";
@@ -35,13 +36,18 @@ function Router() {
       <Route path="/dashboard/onboard" component={OnboardResident} />
       <Route path="/resident/:id" component={Resident} />
       <Route path="/resident/:id/trackers" component={TrackerDashboard} />
-      <Route path="/resident/:id/goals" component={GoalTracker} />
-      <Route path="/resident/:id/checklist" component={ChecklistTracker} />
-      <Route path="/resident/:id/chores" component={ChoreTracker} />
-      <Route path="/resident/:id/accomplishments" component={AccomplishmentTracker} />
-      <Route path="/resident/:id/incidents" component={IncidentTracker} />
-      <Route path="/resident/:id/meetings" component={MeetingTracker} />
-      <Route path="/resident/:id/fees" component={ProgramFeesTracker} />
+      {/* New sidebar-based dashboard routes */}
+      <Route path="/resident/:id/dashboard" component={ResidentDashboard} />
+      <Route path="/resident/:id/goals" component={ResidentDashboard} />
+      <Route path="/resident/:id/checklist" component={ResidentDashboard} />
+      <Route path="/resident/:id/chores" component={ResidentDashboard} />
+      <Route path="/resident/:id/accomplishments" component={ResidentDashboard} />
+      <Route path="/resident/:id/incidents" component={ResidentDashboard} />
+      <Route path="/resident/:id/meetings" component={ResidentDashboard} />
+      <Route path="/resident/:id/fees" component={ResidentDashboard} />
+      <Route path="/resident/:id/reports" component={ResidentDashboard} />
+      <Route path="/resident/:id/pictures" component={ResidentDashboard} />
+      <Route path="/resident/:id/notes" component={ResidentDashboard} />
       <Route component={NotFound} />
     </Switch>
   );
