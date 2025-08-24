@@ -1,0 +1,82 @@
+Shaun—this is still cookies not sticking. Do this exact fix pack:
+
+Trust proxy (needed on Replit for Secure cookies):
+
+// server/index.ts
+const app = express();
+app.set("trust proxy", 1);
+
+
+CORS (exact origin + preflight)
+
+const corsOptions = {
+  origin: process.env.FRONTEND_URL, // EXACT, no trailing slash
+  credentials: true,
+  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"]
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+
+Force cross-site cookie (while you’re on separate origins)
+In login route where you set the cookie:
+
+res.cookie("authToken", token, {
+  httpOnly: true,
+  secure: true,       // REQUIRED with SameSite=None
+  sameSite: "none",   // REQUIRED for cross-origin
+  path: "/",
+  maxAge: 24*60*60*1000,
+});
+
+
+Frontend sends cookies
+
+// client/src/lib/api.ts
+fetch(url, { ...opts, credentials: "include" });
+
+
+Set envs EXACTLY
+
+FRONTEND_URL = the browser origin where App runs (copy from address bar).
+
+VITE_API_URL = your API origin.
+
+If these differ → treat as cross-site (keep step 3). If you make them the same origin (serve client from Express in prod), you can use sameSite:"lax", secure:true/false per HTTPS.
+
+Service worker can cache stale 401s (you have sw.js) → temporarily disable:
+
+// App.tsx (top) — comment out registration during debug
+// navigator.serviceWorker.register('/sw.js')
+navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+
+
+Hard refresh (Ctrl+Shift+R).
+
+Proof test
+
+Log in, then hit:
+
+fetch(`${import.meta.env.VITE_API_URL}/api/whoami`, { credentials:"include" })
+  .then(r=>r.json()).then(console.log);
+
+
+Expect { ok:true, user:"..." }. If 401, it’s still cookie transport.
+
+Nuclear isolate (no cookies)
+Temporarily return the token in JSON and use header (to confirm auth code is fine):
+
+Login response: res.json({ token })
+
+Frontend: Authorization: Bearer ${token}
+
+Middleware: read req.headers.authorization.
+If this works → it’s 100% cookie/CORS/SW, not your auth logic.
+
+If you want a one-liner override: set both frontend and API to the SAME origin (serve the built client from Express), then set cookie to:
+
+sameSite: "lax", secure: true
+
+
+and set FRONTEND_URL to that single origin. This dodges all cross-site issues.

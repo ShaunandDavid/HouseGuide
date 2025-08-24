@@ -17,6 +17,7 @@ console.log('FRONTEND_URL:', process.env.FRONTEND_URL || 'Not set');
 console.log('================================');
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Security middleware
 app.use(helmet({
@@ -25,12 +26,13 @@ app.use(helmet({
 }));
 // CORS configuration - EXACT origin match required for cookies
 const corsOptions = {
-  origin: process.env.FRONTEND_URL, // EXACT origin, no wildcards
+  origin: process.env.FRONTEND_URL, // EXACT, no trailing slash
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"]
 };
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 console.log('CORS configured with origin:', corsOptions.origin);
 
 // Rate limiting for auth endpoints
