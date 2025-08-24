@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
+import { and } from "drizzle-orm";
 import { 
   guides, houses, residents, files, reports, weeklyReports, goals, 
   checklists, chores, accomplishments, incidents, meetings, 
@@ -206,7 +207,7 @@ export class DbStorage implements IStorage {
   }
 
   async getFilesByResident(residentId: string): Promise<FileRecord[]> {
-    const result = await db.select().from(files).where(eq(files.resident, residentId));
+    const result = await db.select().from(files).where(eq(files.residentId, residentId));
     return result.map(file => ({
       ...file,
       created: file.created.toISOString(),
@@ -242,8 +243,7 @@ export class DbStorage implements IStorage {
 
   async getReportByResidentAndWeek(residentId: string, weekStart: string): Promise<Report | undefined> {
     const result = await db.select().from(reports)
-      .where(eq(reports.resident, residentId))
-      .where(eq(reports.weekStart, weekStart))
+      .where(and(eq(reports.resident, residentId), eq(reports.weekStart, weekStart)))
       .limit(1);
     if (result.length === 0) return undefined;
     const report = result[0];
@@ -295,7 +295,7 @@ export class DbStorage implements IStorage {
   }
 
   async getGoalsByResident(residentId: string): Promise<Goal[]> {
-    const result = await db.select().from(goals).where(eq(goals.resident, residentId));
+    const result = await db.select().from(goals).where(eq(goals.residentId, residentId));
     return result.map(goal => ({
       ...goal,
       created: goal.created.toISOString(),
@@ -348,7 +348,7 @@ export class DbStorage implements IStorage {
   }
 
   async getChecklistByResident(residentId: string): Promise<Checklist | undefined> {
-    const result = await db.select().from(checklists).where(eq(checklists.resident, residentId)).limit(1);
+    const result = await db.select().from(checklists).where(eq(checklists.residentId, residentId)).limit(1);
     if (result.length === 0) return undefined;
     const checklist = result[0];
     return {
@@ -399,7 +399,7 @@ export class DbStorage implements IStorage {
   }
 
   async getChoresByResident(residentId: string): Promise<Chore[]> {
-    const result = await db.select().from(chores).where(eq(chores.resident, residentId));
+    const result = await db.select().from(chores).where(eq(chores.residentId, residentId));
     return result.map(chore => ({
       ...chore,
       created: chore.created.toISOString(),
@@ -452,7 +452,7 @@ export class DbStorage implements IStorage {
   }
 
   async getAccomplishmentsByResident(residentId: string): Promise<Accomplishment[]> {
-    const result = await db.select().from(accomplishments).where(eq(accomplishments.resident, residentId));
+    const result = await db.select().from(accomplishments).where(eq(accomplishments.residentId, residentId));
     return result.map(accomplishment => ({
       ...accomplishment,
       created: accomplishment.created.toISOString(),
@@ -505,7 +505,7 @@ export class DbStorage implements IStorage {
   }
 
   async getIncidentsByResident(residentId: string): Promise<Incident[]> {
-    const result = await db.select().from(incidents).where(eq(incidents.resident, residentId));
+    const result = await db.select().from(incidents).where(eq(incidents.residentId, residentId));
     return result.map(incident => ({
       ...incident,
       created: incident.created.toISOString(),
@@ -558,7 +558,7 @@ export class DbStorage implements IStorage {
   }
 
   async getMeetingsByResident(residentId: string): Promise<Meeting[]> {
-    const result = await db.select().from(meetings).where(eq(meetings.resident, residentId));
+    const result = await db.select().from(meetings).where(eq(meetings.residentId, residentId));
     return result.map(meeting => ({
       ...meeting,
       created: meeting.created.toISOString(),
@@ -611,7 +611,7 @@ export class DbStorage implements IStorage {
   }
 
   async getProgramFeesByResident(residentId: string): Promise<ProgramFee[]> {
-    const result = await db.select().from(programFees).where(eq(programFees.resident, residentId));
+    const result = await db.select().from(programFees).where(eq(programFees.residentId, residentId));
     return result.map(fee => ({
       ...fee,
       created: fee.created.toISOString(),
