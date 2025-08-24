@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { PlusIcon, FileTextIcon, ScanTextIcon, CalendarIcon } from "lucide-react";
+import { MicInput } from "@/components/MicInput";
 import { createNote, getNotesByResident } from "@/lib/api";
 import type { Note, InsertNote } from "@shared/schema";
 import { format } from "date-fns";
@@ -24,6 +25,7 @@ interface NoteFormData {
 export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesManagementProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -128,13 +130,40 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
             <CardTitle className="text-base">Create New Note</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Write your note here..."
-              value={newNoteText}
-              onChange={(e) => setNewNoteText(e.target.value)}
-              rows={4}
-              data-testid="textarea-note-content"
-            />
+            <div className="relative">
+              <Textarea
+                ref={noteTextareaRef}
+                placeholder="Write your note here..."
+                value={newNoteText}
+                onChange={(e) => setNewNoteText(e.target.value)}
+                rows={4}
+                className="pr-12"
+                data-testid="textarea-note-content"
+              />
+              <div className="absolute top-2 right-2">
+                <MicInput
+                  targetRef={noteTextareaRef}
+                  onInsertText={(text, cursorPosition) => {
+                    if (noteTextareaRef.current) {
+                      const textarea = noteTextareaRef.current;
+                      const currentValue = textarea.value;
+                      const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                      
+                      const newValue = 
+                        currentValue.slice(0, insertPosition) + 
+                        (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                        text + 
+                        (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                        currentValue.slice(insertPosition);
+                      
+                      setNewNoteText(newValue);
+                    }
+                  }}
+                  size="sm"
+                  variant="ghost"
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button
                 onClick={handleCreateNote}

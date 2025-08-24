@@ -20,10 +20,15 @@ import MeetingTracker from "@/pages/MeetingTracker";
 import ProgramFeesTracker from "@/pages/ProgramFeesTracker";
 import NotFound from "@/pages/not-found";
 
-// Register service worker for PWA — temporarily disabled during debug
+// Register service worker for PWA
 if ('serviceWorker' in navigator) {
-  // navigator.serviceWorker.register('/sw.js')
-  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+  navigator.serviceWorker.register('/sw.js')
+    .then(registration => {
+      console.log('SW registered: ', registration);
+    })
+    .catch(registrationError => {
+      console.log('SW registration failed: ', registrationError);
+    });
 }
 
 function Router() {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Award, Calendar } from "lucide-react";
+import { MicInput } from "@/components/MicInput";
 import { getResident, getAccomplishmentsByResident, createAccomplishment, updateAccomplishment, deleteAccomplishment, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Accomplishment } from "@shared/schema";
@@ -32,6 +33,7 @@ export default function AccomplishmentTracker() {
     category: 'personal' as 'personal' | 'work' | 'education' | 'recovery' | 'social' | 'other',
     dateAchieved: ''
   });
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (id) {
@@ -321,13 +323,40 @@ export default function AccomplishmentTracker() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter accomplishment description"
-                rows={3}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={descriptionTextareaRef}
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter accomplishment description"
+                  rows={3}
+                  className="pr-12"
+                />
+                <div className="absolute top-2 right-2">
+                  <MicInput
+                    targetRef={descriptionTextareaRef}
+                    onInsertText={(text, cursorPosition) => {
+                      if (descriptionTextareaRef.current) {
+                        const textarea = descriptionTextareaRef.current;
+                        const currentValue = textarea.value;
+                        const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                        
+                        const newValue = 
+                          currentValue.slice(0, insertPosition) + 
+                          (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                          text + 
+                          (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                          currentValue.slice(insertPosition);
+                        
+                        setFormData(prev => ({ ...prev, description: newValue }));
+                      }
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

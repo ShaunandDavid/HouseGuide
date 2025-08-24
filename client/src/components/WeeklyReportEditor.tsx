@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateWeeklyReport, createWeeklyReport, getAIStatus, getWeeklyReportsByResident } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Wand2, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { MicInput } from '@/components/MicInput';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { Resident, WeeklyReport } from '@shared/schema';
@@ -24,6 +25,7 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
   const [reportText, setReportText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationData, setGenerationData] = useState<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -251,18 +253,44 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
           {/* Report Editor */}
           <div className="space-y-2">
             <Label htmlFor="report-content">Report Content</Label>
-            <Textarea
-              id="report-content"
-              placeholder={aiStatus?.available 
-                ? "Click 'Generate AI Report' to create a draft, or write your report manually..."
-                : "Write your weekly report manually..."
-              }
-              value={reportText}
-              onChange={(e) => setReportText(e.target.value)}
-              rows={20}
-              className="font-mono text-sm"
-              data-testid="textarea-report-content"
-            />
+            <div className="relative">
+              <Textarea
+                ref={textareaRef}
+                id="report-content"
+                placeholder={aiStatus?.available 
+                  ? "Click 'Generate AI Report' to create a draft, or write your report manually..."
+                  : "Write your weekly report manually..."
+                }
+                value={reportText}
+                onChange={(e) => setReportText(e.target.value)}
+                rows={20}
+                className="font-mono text-sm pr-12"
+                data-testid="textarea-report-content"
+              />
+              <div className="absolute top-2 right-2">
+                <MicInput
+                  targetRef={textareaRef}
+                  onInsertText={(text, cursorPosition) => {
+                    if (textareaRef.current) {
+                      const textarea = textareaRef.current;
+                      const currentValue = textarea.value;
+                      const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                      
+                      const newValue = 
+                        currentValue.slice(0, insertPosition) + 
+                        (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                        text + 
+                        (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                        currentValue.slice(insertPosition);
+                      
+                      setReportText(newValue);
+                    }
+                  }}
+                  size="sm"
+                  variant="ghost"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Save Actions */}

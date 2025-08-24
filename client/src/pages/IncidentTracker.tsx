@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, AlertTriangle, Calendar, AlertCircle } from "lucide-react";
+import { MicInput } from "@/components/MicInput";
 import { getResident, getIncidentsByResident, createIncident, updateIncident, deleteIncident, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Incident } from "@shared/schema";
@@ -34,6 +35,8 @@ export default function IncidentTracker() {
     actionTaken: '',
     followUpRequired: false
   });
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const actionTakenTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (id) {
@@ -356,13 +359,40 @@ export default function IncidentTracker() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe the incident"
-                rows={3}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={descriptionTextareaRef}
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe the incident"
+                  rows={3}
+                  className="pr-12"
+                />
+                <div className="absolute top-2 right-2">
+                  <MicInput
+                    targetRef={descriptionTextareaRef}
+                    onInsertText={(text, cursorPosition) => {
+                      if (descriptionTextareaRef.current) {
+                        const textarea = descriptionTextareaRef.current;
+                        const currentValue = textarea.value;
+                        const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                        
+                        const newValue = 
+                          currentValue.slice(0, insertPosition) + 
+                          (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                          text + 
+                          (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                          currentValue.slice(insertPosition);
+                        
+                        setFormData(prev => ({ ...prev, description: newValue }));
+                      }
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -391,13 +421,40 @@ export default function IncidentTracker() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="actionTaken">Action Taken</Label>
-              <Textarea
-                id="actionTaken"
-                value={formData.actionTaken}
-                onChange={(e) => setFormData(prev => ({ ...prev, actionTaken: e.target.value }))}
-                placeholder="Describe actions taken (optional)"
-                rows={2}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={actionTakenTextareaRef}
+                  id="actionTaken"
+                  value={formData.actionTaken}
+                  onChange={(e) => setFormData(prev => ({ ...prev, actionTaken: e.target.value }))}
+                  placeholder="Describe actions taken (optional)"
+                  rows={2}
+                  className="pr-12"
+                />
+                <div className="absolute top-2 right-2">
+                  <MicInput
+                    targetRef={actionTakenTextareaRef}
+                    onInsertText={(text, cursorPosition) => {
+                      if (actionTakenTextareaRef.current) {
+                        const textarea = actionTakenTextareaRef.current;
+                        const currentValue = textarea.value;
+                        const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                        
+                        const newValue = 
+                          currentValue.slice(0, insertPosition) + 
+                          (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                          text + 
+                          (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                          currentValue.slice(insertPosition);
+                        
+                        setFormData(prev => ({ ...prev, actionTaken: newValue }));
+                      }
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <input
