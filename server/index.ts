@@ -23,9 +23,11 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable for Vite dev server
   crossOriginEmbedderPolicy: false
 }));
-// CORS configuration
+// CORS configuration - allow localhost in development
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || true,
+  origin: process.env.NODE_ENV === 'development' 
+    ? true  // Allow all origins in development
+    : process.env.FRONTEND_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']

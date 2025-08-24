@@ -18,6 +18,7 @@ export default function Register() {
     name: "",
     houseName: ""
   });
+  const [startWithBlankSlate, setStartWithBlankSlate] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [, setLocation] = useLocation();
@@ -31,7 +32,7 @@ export default function Register() {
     e.preventDefault();
     
     // Validation
-    if (!formData.email || !formData.password || !formData.name || !formData.houseName) {
+    if (!formData.email || !formData.password || !formData.name) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -70,8 +71,9 @@ export default function Register() {
           email: formData.email,
           password: formData.password,
           name: formData.name,
-          houseName: formData.houseName
+          houseName: formData.houseName || `${formData.name}'s House`
         }),
+        credentials: 'include',
       });
       
       if (!response.ok) {
@@ -160,17 +162,18 @@ export default function Register() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="houseName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Facility Name *
+                  Facility Name (optional)
                 </Label>
                 <Input
                   id="houseName"
                   type="text"
                   value={formData.houseName}
                   onChange={(e) => handleInputChange('houseName', e.target.value)}
-                  placeholder="e.g., 1021 Wall Street"
+                  placeholder="Leave blank to auto-generate"
                   disabled={isLoading}
                   data-testid="input-house-name"
                 />
+                <p className="text-sm text-gray-500 mt-1">Just for organization - you can change this later</p>
               </div>
 
               <div>
@@ -231,6 +234,19 @@ export default function Register() {
                   disabled={isLoading}
                   data-testid="input-confirm-password"
                 />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="blankSlate"
+                  checked={startWithBlankSlate}
+                  onChange={(e) => setStartWithBlankSlate(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="blankSlate" className="text-sm font-medium text-gray-700">
+                  Start with blank slate (no sample residents)
+                </Label>
               </div>
               
               <Button 
