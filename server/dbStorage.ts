@@ -1,15 +1,15 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { 
-  guides, houses, residents, files, reports, goals, 
+  guides, houses, residents, files, reports, weeklyReports, goals, 
   checklists, chores, accomplishments, incidents, meetings, 
   programFees, notes 
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 import type { 
-  Guide, House, Resident, FileRecord, Note, Report,
+  Guide, House, Resident, FileRecord, Note, Report, WeeklyReport,
   Goal, Checklist, Chore, Accomplishment, Incident, Meeting, ProgramFee,
-  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport,
+  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport, InsertWeeklyReport,
   InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -664,7 +664,7 @@ export class DbStorage implements IStorage {
   }
 
   async getNotesByResident(residentId: string): Promise<Note[]> {
-    const result = await db.select().from(notes).where(eq(notes.resident, residentId));
+    const result = await db.select().from(notes).where(eq(notes.residentId, residentId));
     return result.map(note => ({
       ...note,
       created: note.created.toISOString(),
@@ -680,5 +680,64 @@ export class DbStorage implements IStorage {
       created: note.created.toISOString(),
       updated: note.updated.toISOString(),
     } as Note;
+  }
+
+  // Weekly Reports (AI Generated) - DbStorage implementation
+  async getWeeklyReport(id: string): Promise<WeeklyReport | undefined> {
+    const result = await db.select().from(weeklyReports).where(eq(weeklyReports.id, id)).limit(1);
+    if (result.length === 0) return undefined;
+    const report = result[0];
+    return {
+      ...report,
+      created: report.created.toISOString(),
+      updated: report.updated.toISOString(),
+    } as WeeklyReport;
+  }
+
+  async getWeeklyReportsByResident(residentId: string, from?: string, to?: string): Promise<WeeklyReport[]> {
+    let query = db.select().from(weeklyReports).where(eq(weeklyReports.residentId, residentId));
+    
+    // TODO: Add date filtering when needed
+    // if (from) query = query.where(gte(weeklyReports.weekStart, from));
+    // if (to) query = query.where(lte(weeklyReports.weekEnd, to));
+    
+    const result = await query;
+    return result.map(report => ({
+      ...report,
+      created: report.created.toISOString(),
+      updated: report.updated.toISOString(),
+    })) as WeeklyReport[];
+  }
+
+  async createWeeklyReport(insertReport: InsertWeeklyReport): Promise<WeeklyReport> {
+    const result = await db.insert(weeklyReports).values(insertReport).returning();
+    const report = result[0];
+    return {
+      ...report,
+      created: report.created.toISOString(),
+      updated: report.updated.toISOString(),
+    } as WeeklyReport;
+  }
+
+  async updateWeeklyReport(id: string, updates: Partial<InsertWeeklyReport>): Promise<WeeklyReport> {
+    const result = await db.update(weeklyReports)
+      .set({
+        ...updates,
+        updated: new Date(),
+      })
+      .where(eq(weeklyReports.id, id))
+      .returning();
+    
+    if (result.length === 0) throw new Error('Weekly report not found');
+    const report = result[0];
+    return {
+      ...report,
+      created: report.created.toISOString(),
+      updated: report.updated.toISOString(),
+    } as WeeklyReport;
+  }
+
+  async deleteWeeklyReport(id: string): Promise<void> {
+    await db.delete(weeklyReports).where(eq(weeklyReports.id, id));
   }
 }

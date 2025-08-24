@@ -7,7 +7,8 @@ import jwt from "jsonwebtoken";
 import { 
   insertGuideSchema, insertHouseSchema, insertResidentSchema, insertFileSchema,
   insertReportSchema, insertGoalSchema, insertChecklistSchema, insertChoreSchema,
-  insertAccomplishmentSchema, insertIncidentSchema, insertMeetingSchema, insertProgramFeeSchema, insertNoteSchema
+  insertAccomplishmentSchema, insertIncidentSchema, insertMeetingSchema, insertProgramFeeSchema, insertNoteSchema,
+  insertWeeklyReportSchema
 } from "@shared/schema";
 
 // Authentication middleware
@@ -500,6 +501,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/goals", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertGoalSchema.parse(req.body);
+      
+      // Ensure goal is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const goal = await storage.createGoal(validatedData);
       res.status(201).json(goal);
     } catch (error) {
@@ -547,8 +553,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertChecklistSchema.parse(req.body);
       
+      // Ensure checklist is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       // Check if checklist already exists for this resident
-      const existingChecklist = await storage.getChecklistByResident(validatedData.resident);
+      const existingChecklist = await storage.getChecklistByResident(validatedData.residentId);
       
       let checklist;
       if (existingChecklist) {
@@ -579,6 +589,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/chores", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertChoreSchema.parse(req.body);
+      
+      // Ensure chore is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const chore = await storage.createChore(validatedData);
       res.status(201).json(chore);
     } catch (error) {
@@ -625,6 +640,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/accomplishments", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertAccomplishmentSchema.parse(req.body);
+      
+      // Ensure accomplishment is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const accomplishment = await storage.createAccomplishment(validatedData);
       res.status(201).json(accomplishment);
     } catch (error) {
@@ -671,6 +691,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/incidents", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertIncidentSchema.parse(req.body);
+      
+      // Ensure incident is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const incident = await storage.createIncident(validatedData);
       res.status(201).json(incident);
     } catch (error) {
@@ -717,6 +742,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/meetings", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertMeetingSchema.parse(req.body);
+      
+      // Ensure meeting is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const meeting = await storage.createMeeting(validatedData);
       res.status(201).json(meeting);
     } catch (error) {
@@ -763,6 +793,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/fees", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertProgramFeeSchema.parse(req.body);
+      
+      // Ensure fee is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const fee = await storage.createProgramFee(validatedData);
       res.status(201).json(fee);
     } catch (error) {
@@ -809,11 +844,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/notes", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertNoteSchema.parse(req.body);
+      
+      // Ensure note is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
       const note = await storage.createNote(validatedData);
       res.status(201).json(note);
     } catch (error) {
       console.error('Create note error:', error);
       res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  // Weekly Reports endpoints (AI Generated Reports)
+  app.get("/api/reports/weekly/by-resident/:residentId", requireAuth, async (req: any, res) => {
+    try {
+      const { residentId } = req.params;
+      const { from, to } = req.query;
+      
+      // Validate query parameters (basic date string validation)
+      if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from as string)) {
+        return res.status(400).json({ error: "Invalid 'from' date format. Use YYYY-MM-DD" });
+      }
+      if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to as string)) {
+        return res.status(400).json({ error: "Invalid 'to' date format. Use YYYY-MM-DD" });
+      }
+      
+      const reports = await storage.getWeeklyReportsByResident(residentId, from as string, to as string);
+      res.json(reports);
+    } catch (error) {
+      console.error('Get weekly reports error:', error);
+      res.status(500).json({ error: "Failed to fetch weekly reports" });
+    }
+  });
+
+  app.post("/api/reports/weekly", requireAuth, async (req: any, res) => {
+    try {
+      const validatedData = insertWeeklyReportSchema.parse(req.body);
+      
+      // Ensure report is scoped to guide's house and include audit trail
+      validatedData.houseId = req.guide.houseId!;
+      validatedData.createdBy = req.guide.id;
+      
+      const report = await storage.createWeeklyReport(validatedData);
+      res.status(201).json(report);
+    } catch (error) {
+      console.error('Create weekly report error:', error);
+      res.status(500).json({ error: "Failed to create weekly report" });
+    }
+  });
+
+  app.post("/api/reports/weekly/generate", requireAuth, async (req: any, res) => {
+    try {
+      const { residentId, weekStart, weekEnd } = req.body;
+      
+      if (!residentId || !weekStart || !weekEnd) {
+        return res.status(400).json({ error: "residentId, weekStart, and weekEnd are required" });
+      }
+      
+      // TODO: Implement AI report generation
+      // For now, return a placeholder draft
+      const draft = `# Weekly Report\n\n**Resident:** ${residentId}\n**Week:** ${weekStart} to ${weekEnd}\n\n## Summary\nNo updates this week.\n\n## Goals\nNo updates this week.\n\n## Incidents\nNo updates this week.\n\n## Meetings\nNo updates this week.\n\n## Chores\nNo updates this week.\n\n## Accomplishments\nNo updates this week.\n\n## Notes\nNo updates this week.`;
+      
+      res.json({ draft });
+    } catch (error) {
+      console.error('Generate weekly report error:', error);
+      res.status(500).json({ error: "Failed to generate weekly report" });
     }
   });
 

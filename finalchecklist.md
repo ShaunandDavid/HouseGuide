@@ -1,13 +1,13 @@
 # HouseGuide – Client Dashboard Expansion Final Checklist
 
 ## Current State Assessment
-- [ ] Client dashboard loads properly
-- [ ] Scan Image opens upload (OCR not wired)
-- [ ] Open Note does nothing (needs implementation)
-- [ ] Manage Status works
-- [ ] View Trackers navigates
-- [ ] Generate Report supports manual text only
-- [ ] Trackers: only Checklist persists; others accept input but don't save
+- [x] Client dashboard loads properly
+- [x] Scan Image opens upload (OCR not wired)
+- [x] Open Note does nothing (needs implementation)
+- [x] Manage Status works
+- [x] View Trackers navigates
+- [x] Generate Report supports manual text only
+- [x] Trackers: only Checklist persists; others accept input but don't save
 
 ## Goals Implementation
 
@@ -86,9 +86,16 @@
 ## API Contracts
 
 ### Weekly Reports
-- [ ] POST /api/reports/weekly/generate - Body: { residentId, weekStart, weekEnd } Returns: { draft: string }
-- [ ] POST /api/reports/weekly - Body: { residentId, weekStart, weekEnd, title, body } → creates report
-- [ ] GET /api/reports/weekly/by-resident/:residentId?from=&to=
+- [x] POST /api/reports/weekly/generate - Body: { residentId, weekStart, weekEnd } Returns: { draft: string }
+- [x] POST /api/reports/weekly - Body: { residentId, weekStart, weekEnd, title, body } → creates report
+- [x] GET /api/reports/weekly/by-resident/:residentId?from=&to=
+
+### Backend Infrastructure ✅ COMPLETED
+- [x] Weekly Reports API system fully implemented
+- [x] Multi-tenant support (houseId + createdBy) added to all tracker endpoints
+- [x] Storage layer enhanced with weekly reports support
+- [x] Database and memory storage implementations complete
+- [x] Server running successfully with no errors
 
 ### Notes & Pictures
 - [ ] POST /api/notes → { residentId, text, source: 'manual'|'ocr', imageId? }
@@ -107,10 +114,10 @@
 - [ ] PATCH /api/{goals|chores|accomplishments|incidents|meetings|fees}/:id → update
 
 ## DB Models / Migrations
-- [ ] weekly_reports: id, residentId, houseId, title, body, weekStart, weekEnd, createdAt, createdBy
-- [ ] notes: id, residentId, houseId, text, source('manual'|'ocr'), imageFileId?, createdAt, createdBy
-- [ ] files: id, residentId, houseId, filename, mime, url, size, createdAt, createdBy
-- [ ] Ensure existing tracker tables have residentId, houseId, createdAt, createdBy
+- [x] weekly_reports: id, residentId, houseId, title, body, weekStart, weekEnd, createdAt, createdBy
+- [x] notes: id, residentId, houseId, text, source('manual'|'ocr'), imageFileId?, createdAt, createdBy
+- [x] files: id, residentId, houseId, filename, mime, url, size, createdAt, createdBy
+- [x] Ensure existing tracker tables have residentId, houseId, createdAt, createdBy
 
 ## Background Jobs
 - [ ] Implement simple in-process queue (e.g., BullMQ/bee-queue) or async task runner

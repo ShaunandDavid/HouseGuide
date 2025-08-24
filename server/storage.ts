@@ -1,7 +1,7 @@
 import type { 
-  Guide, House, Resident, FileRecord, Note, Report,
+  Guide, House, Resident, FileRecord, Note, Report, WeeklyReport,
   Goal, Checklist, Chore, Accomplishment, Incident, Meeting, ProgramFee,
-  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport,
+  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport, InsertWeeklyReport,
   InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -91,6 +91,13 @@ export interface IStorage {
   getNote(id: string): Promise<Note | undefined>;
   getNotesByResident(residentId: string): Promise<Note[]>;
   createNote(note: InsertNote): Promise<Note>;
+  
+  // Weekly Reports (AI Generated)
+  getWeeklyReport(id: string): Promise<WeeklyReport | undefined>;
+  getWeeklyReportsByResident(residentId: string, from?: string, to?: string): Promise<WeeklyReport[]>;
+  createWeeklyReport(report: InsertWeeklyReport): Promise<WeeklyReport>;
+  updateWeeklyReport(id: string, updates: Partial<InsertWeeklyReport>): Promise<WeeklyReport>;
+  deleteWeeklyReport(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -107,6 +114,7 @@ export class MemStorage implements IStorage {
   private meetings: Map<string, Meeting> = new Map();
   private programFees: Map<string, ProgramFee> = new Map();
   private notes: Map<string, Note> = new Map();
+  private weeklyReports: Map<string, WeeklyReport> = new Map();
 
   constructor() {
     // Initialize with default house
@@ -578,7 +586,7 @@ export class MemStorage implements IStorage {
   }
 
   async getNotesByResident(residentId: string): Promise<Note[]> {
-    return Array.from(this.notes.values()).filter(note => note.resident === residentId);
+    return Array.from(this.notes.values()).filter(note => note.residentId === residentId);
   }
 
   async createNote(insertNote: InsertNote): Promise<Note> {
@@ -591,6 +599,55 @@ export class MemStorage implements IStorage {
     };
     this.notes.set(id, note);
     return note;
+  }
+
+  // Weekly Reports (AI Generated) - MemStorage implementation
+  async getWeeklyReport(id: string): Promise<WeeklyReport | undefined> {
+    return this.weeklyReports.get(id);
+  }
+
+  async getWeeklyReportsByResident(residentId: string, from?: string, to?: string): Promise<WeeklyReport[]> {
+    let reports = Array.from(this.weeklyReports.values()).filter(r => r.residentId === residentId);
+    
+    if (from) {
+      reports = reports.filter(r => r.weekStart >= from);
+    }
+    if (to) {
+      reports = reports.filter(r => r.weekEnd <= to);
+    }
+    
+    return reports.sort((a, b) => b.weekStart.localeCompare(a.weekStart)); // Most recent first
+  }
+
+  async createWeeklyReport(insertReport: InsertWeeklyReport): Promise<WeeklyReport> {
+    const id = randomUUID();
+    const report: WeeklyReport = {
+      ...insertReport,
+      id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.weeklyReports.set(id, report);
+    return report;
+  }
+
+  async updateWeeklyReport(id: string, updates: Partial<InsertWeeklyReport>): Promise<WeeklyReport> {
+    const existing = this.weeklyReports.get(id);
+    if (!existing) {
+      throw new Error(`Weekly report not found: ${id}`);
+    }
+    
+    const updated: WeeklyReport = {
+      ...existing,
+      ...updates,
+      updated: new Date().toISOString()
+    };
+    this.weeklyReports.set(id, updated);
+    return updated;
+  }
+
+  async deleteWeeklyReport(id: string): Promise<void> {
+    this.weeklyReports.delete(id);
   }
 }
 
