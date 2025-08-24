@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { pgTable, varchar, boolean, timestamp, text, serial, integer } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Guide (Auth User) Schema
 export const insertGuideSchema = z.object({
@@ -298,3 +300,155 @@ export interface ProgramFee {
   created: string;
   updated: string;
 }
+
+// Drizzle Table Definitions
+export const guides = pgTable("guides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  password: varchar("password", { length: 255 }).notNull(),
+  houseName: varchar("house_name", { length: 80 }).notNull(),
+  houseId: varchar("house_id"),
+  isEmailVerified: boolean("is_email_verified").default(false).notNull(),
+  verificationToken: varchar("verification_token", { length: 255 }),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const houses = pgTable("houses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 80 }).notNull(),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const residents = pgTable("residents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  house: varchar("house").notNull(),
+  firstName: varchar("first_name", { length: 60 }).notNull(),
+  lastInitial: varchar("last_initial", { length: 2 }).notNull(),
+  status: varchar("status", { length: 20 }).default("active"),
+  residentId: varchar("resident_id", { length: 40 }),
+  dischargeDate: varchar("discharge_date"),
+  dischargeReason: varchar("discharge_reason", { length: 500 }),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const files = pgTable("files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  type: varchar("type", { length: 20 }).notNull(),
+  image: text("image").notNull(),
+  ocrText: text("ocr_text"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const notes = pgTable("notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  type: varchar("type", { length: 20 }),
+  text: text("text"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const reports = pgTable("reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  weekStart: varchar("week_start").notNull(),
+  s1_sponsor: text("s1_sponsor"),
+  s2_work: text("s2_work"),
+  s3_chores: text("s3_chores"),
+  s4_demeanor: text("s4_demeanor"),
+  s5_professional: text("s5_professional"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const goals = pgTable("goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  targetDate: varchar("target_date"),
+  status: varchar("status", { length: 20 }).default("not_started").notNull(),
+  priority: varchar("priority", { length: 10 }).default("medium").notNull(),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const checklists = pgTable("checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  phase: varchar("phase", { length: 100 }),
+  homeGroup: varchar("home_group", { length: 200 }),
+  stepWork: varchar("step_work", { length: 500 }),
+  professionalHelp: varchar("professional_help", { length: 500 }),
+  job: varchar("job", { length: 200 }),
+  lastUpdated: varchar("last_updated"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const chores = pgTable("chores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  choreName: varchar("chore_name", { length: 200 }).notNull(),
+  assignedDate: varchar("assigned_date").notNull(),
+  dueDate: varchar("due_date"),
+  status: varchar("status", { length: 20 }).default("assigned").notNull(),
+  notes: text("notes"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const accomplishments = pgTable("accomplishments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  dateAchieved: varchar("date_achieved").notNull(),
+  category: varchar("category", { length: 20 }).default("personal").notNull(),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const incidents = pgTable("incidents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  incidentType: varchar("incident_type", { length: 50 }).notNull(),
+  dateOccurred: varchar("date_occurred").notNull(),
+  description: text("description").notNull(),
+  severity: varchar("severity", { length: 20 }).default("low").notNull(),
+  resolved: boolean("resolved").default(false).notNull(),
+  resolutionNotes: text("resolution_notes"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const meetings = pgTable("meetings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  meetingType: varchar("meeting_type", { length: 30 }).notNull(),
+  dateAttended: varchar("date_attended").notNull(),
+  duration: integer("duration"),
+  location: varchar("location", { length: 200 }),
+  notes: text("notes"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const programFees = pgTable("program_fees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resident: varchar("resident").notNull(),
+  feeType: varchar("fee_type", { length: 20 }).notNull(),
+  amount: integer("amount").notNull(),
+  dueDate: varchar("due_date").notNull(),
+  paidDate: varchar("paid_date"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  notes: text("notes"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
