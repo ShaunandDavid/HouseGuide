@@ -22,7 +22,9 @@ export default function VerifyEmail() {
     }
 
     // Verify email
-    fetch(`/api/auth/verify-email?token=${token}`)
+    fetch(`/api/auth/verify-email?token=${token}`, {
+      credentials: 'include'
+    })
       .then(response => response.json())
       .then(data => {
         if (data.success) {

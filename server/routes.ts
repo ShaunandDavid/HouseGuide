@@ -188,23 +188,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // First create the house
       const house = await storage.createHouse({
-        name: validatedData.houseName,
-        address: "",
-        phone: "",
-        email: validatedData.email
+        name: validatedData.houseName
       });
       
       console.log(`SIGNUP: Created house - ID: ${house.id}, Name: ${house.name}`);
 
-      // Hash password and create guide with house reference
+      // Hash password and create guide
       const hashedPassword = await bcrypt.hash(validatedData.password, 12);
       const guide = await storage.createGuide({
         ...validatedData,
-        password: hashedPassword,
-        houseId: house.id
+        password: hashedPassword
       });
       
-      console.log(`SIGNUP: Created user - ID: ${guide.id}, Email: ${guide.email}, HouseID: ${guide.houseId}, Verified: ${guide.isEmailVerified}`);
+      // Update guide with houseId and get updated guide
+      const updatedGuide = await storage.updateGuide(guide.id, { houseId: house.id });
+      
+      console.log(`SIGNUP: Created user - ID: ${updatedGuide.id}, Email: ${updatedGuide.email}, HouseID: ${updatedGuide.houseId}, Verified: ${updatedGuide.isEmailVerified}`);
 
       // Send verification email
       const baseUrl = process.env.NODE_ENV === 'production' 
