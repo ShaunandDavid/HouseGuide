@@ -25,8 +25,11 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       html: params.html,
     });
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('SendGrid email error:', error);
+    if (error.response?.body?.errors) {
+      console.error('SendGrid error details:', JSON.stringify(error.response.body.errors, null, 2));
+    }
     return false;
   }
 }
