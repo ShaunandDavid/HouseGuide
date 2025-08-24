@@ -113,11 +113,11 @@ app.use((req, res, next) => {
 
   // Serve React frontend in production
   if (process.env.NODE_ENV === "production") {
-    const clientPath = path.join(import.meta.dirname, "..", "dist", "public");
+    const clientPath = path.resolve(import.meta.dirname, "public");
     app.use(express.static(clientPath));
-    app.get("*", (_, res) =>
-      res.sendFile(path.join(clientPath, "index.html"))
-    );
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(clientPath, "index.html"));
+    });
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
