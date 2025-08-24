@@ -4,8 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Home, Calendar, Clock } from "lucide-react";
-import { getResident, getChoresByResident } from "@/lib/api";
+import { getResident, getChoresByResident, createChore, updateChore, deleteChore, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Chore } from "@shared/schema";
 
@@ -15,7 +20,19 @@ export default function ChoreTracker() {
   const [resident, setResident] = useState<Resident | null>(null);
   const [chores, setChores] = useState<Chore[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showChoreDialog, setShowChoreDialog] = useState(false);
+  const [editingChore, setEditingChore] = useState<Chore | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    choreName: '',
+    notes: '',
+    status: 'assigned' as 'assigned' | 'in_progress' | 'completed' | 'missed',
+    assignedDate: '',
+    dueDate: ''
+  });
 
   useEffect(() => {
     if (id) {
@@ -52,6 +69,111 @@ export default function ChoreTracker() {
 
   const handleGoBack = () => {
     setLocation(`/resident/${id}/trackers`);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      choreName: '',
+      notes: '',
+      status: 'assigned',
+      assignedDate: '',
+      dueDate: ''
+    });
+    setEditingChore(null);
+  };
+
+  const handleAddChore = () => {
+    resetForm();
+    setShowChoreDialog(true);
+  };
+
+  const handleEditChore = (chore: Chore) => {
+    setFormData({
+      choreName: chore.choreName,
+      notes: chore.notes || '',
+      status: chore.status,
+      assignedDate: chore.assignedDate || '',
+      dueDate: chore.dueDate || ''
+    });
+    setEditingChore(chore);
+    setShowChoreDialog(true);
+  };
+
+  const handleSaveChore = async () => {
+    if (!id) return;
+    
+    const currentUser = getCurrentUser();
+    if (!currentUser || !currentUser.houseId) {
+      toast({
+        title: "Authentication Error",
+        description: "Unable to identify current user. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      if (editingChore) {
+        // Update existing chore
+        const updatedChore = await updateChore(editingChore.id, {
+          choreName: formData.choreName,
+          notes: formData.notes,
+          status: formData.status,
+          assignedDate: formData.assignedDate || undefined,
+          dueDate: formData.dueDate || undefined
+        });
+        setChores(prev => prev.map(chore => chore.id === editingChore.id ? updatedChore : chore));
+        toast({
+          title: "Chore Updated",
+          description: "Chore has been updated successfully.",
+        });
+      } else {
+        // Create new chore
+        const newChore = await createChore({
+          residentId: id,
+          houseId: currentUser.houseId,
+          createdBy: currentUser.id,
+          choreName: formData.choreName,
+          notes: formData.notes,
+          status: formData.status,
+          assignedDate: formData.assignedDate || undefined,
+          dueDate: formData.dueDate || undefined
+        });
+        setChores(prev => [...prev, newChore]);
+        toast({
+          title: "Chore Created",
+          description: "New chore has been created successfully.",
+        });
+      }
+      setShowChoreDialog(false);
+      resetForm();
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save the chore. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteChore = async (choreId: string) => {
+    try {
+      await deleteChore(choreId);
+      setChores(prev => prev.filter(chore => chore.id !== choreId));
+      toast({
+        title: "Chore Deleted",
+        description: "Chore has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the chore. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -109,7 +231,7 @@ export default function ChoreTracker() {
               <p className="text-sm text-gray-600">{resident.firstName} {resident.lastInitial}.</p>
             </div>
           </div>
-          <Button data-testid="add-chore-button">
+          <Button onClick={handleAddChore} data-testid="add-chore-button">
             <Plus className="w-4 h-4 mr-2" />
             Add Chore
           </Button>
@@ -123,7 +245,7 @@ export default function ChoreTracker() {
               <Home className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">No Chores Assigned</h4>
               <p className="text-gray-600 mb-4">Track household responsibilities and completion status.</p>
-              <Button data-testid="add-first-chore">
+              <Button onClick={handleAddChore} data-testid="add-first-chore">
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Chore
               </Button>
@@ -150,7 +272,8 @@ export default function ChoreTracker() {
                     </Badge>
                   </div>
                   
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
                       <span data-testid="assigned-date">Assigned: {formatDate(chore.assignedDate)}</span>
@@ -161,6 +284,26 @@ export default function ChoreTracker() {
                         <span data-testid="due-date">Due: {formatDate(chore.dueDate)}</span>
                       </div>
                     )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditChore(chore)}
+                        data-testid={`edit-chore-${chore.id}`}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteChore(chore.id)}
+                        data-testid={`delete-chore-${chore.id}`}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -168,6 +311,80 @@ export default function ChoreTracker() {
           </div>
         )}
       </main>
+
+      {/* Chore Dialog */}
+      <Dialog open={showChoreDialog} onOpenChange={setShowChoreDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingChore ? 'Edit Chore' : 'Add New Chore'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="choreName">Chore Name</Label>
+              <Input
+                id="choreName"
+                value={formData.choreName}
+                onChange={(e) => setFormData(prev => ({ ...prev, choreName: e.target.value }))}
+                placeholder="Enter chore name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Enter additional notes"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="assignedDate">Assigned Date</Label>
+                <Input
+                  id="assignedDate"
+                  type="date"
+                  value={formData.assignedDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, assignedDate: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={formData.status} onValueChange={(value: 'assigned' | 'in_progress' | 'completed' | 'missed') => setFormData(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="missed">Missed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowChoreDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveChore} disabled={isSaving || !formData.choreName}>
+              {isSaving ? 'Saving...' : editingChore ? 'Update Chore' : 'Create Chore'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

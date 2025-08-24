@@ -4,8 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, DollarSign, Calendar, CheckCircle } from "lucide-react";
-import { getResident, getFeesByResident } from "@/lib/api";
+import { getResident, getFeesByResident, createFee, updateFee, deleteFee, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, ProgramFee } from "@shared/schema";
 
@@ -15,7 +20,20 @@ export default function ProgramFeesTracker() {
   const [resident, setResident] = useState<Resident | null>(null);
   const [fees, setFees] = useState<ProgramFee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showFeeDialog, setShowFeeDialog] = useState(false);
+  const [editingFee, setEditingFee] = useState<ProgramFee | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    feeType: 'rent' as 'rent' | 'program_fee' | 'fine' | 'deposit' | 'other',
+    amount: '',
+    dueDate: '',
+    paidDate: '',
+    status: 'pending' as 'pending' | 'paid' | 'overdue' | 'waived',
+    notes: ''
+  });
 
   useEffect(() => {
     if (id) {
@@ -52,6 +70,115 @@ export default function ProgramFeesTracker() {
 
   const handleGoBack = () => {
     setLocation(`/resident/${id}/trackers`);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      feeType: 'rent',
+      amount: '',
+      dueDate: '',
+      paidDate: '',
+      status: 'pending',
+      notes: ''
+    });
+    setEditingFee(null);
+  };
+
+  const handleAddFee = () => {
+    resetForm();
+    setShowFeeDialog(true);
+  };
+
+  const handleEditFee = (fee: ProgramFee) => {
+    setFormData({
+      feeType: fee.feeType,
+      amount: fee.amount.toString(),
+      dueDate: fee.dueDate,
+      paidDate: fee.paidDate || '',
+      status: fee.status,
+      notes: fee.notes || ''
+    });
+    setEditingFee(fee);
+    setShowFeeDialog(true);
+  };
+
+  const handleSaveFee = async () => {
+    if (!id) return;
+    
+    const currentUser = getCurrentUser();
+    if (!currentUser || !currentUser.houseId) {
+      toast({
+        title: "Authentication Error",
+        description: "Unable to identify current user. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      if (editingFee) {
+        // Update existing fee
+        const updatedFee = await updateFee(editingFee.id, {
+          feeType: formData.feeType,
+          amount: parseFloat(formData.amount),
+          dueDate: formData.dueDate,
+          paidDate: formData.paidDate || undefined,
+          status: formData.status,
+          notes: formData.notes || undefined
+        });
+        setFees(prev => prev.map(fee => fee.id === editingFee.id ? updatedFee : fee));
+        toast({
+          title: "Fee Updated",
+          description: "Program fee has been updated successfully.",
+        });
+      } else {
+        // Create new fee
+        const newFee = await createFee({
+          residentId: id,
+          houseId: currentUser.houseId,
+          createdBy: currentUser.id,
+          feeType: formData.feeType,
+          amount: parseFloat(formData.amount),
+          dueDate: formData.dueDate,
+          paidDate: formData.paidDate || undefined,
+          status: formData.status,
+          notes: formData.notes || undefined
+        });
+        setFees(prev => [...prev, newFee]);
+        toast({
+          title: "Fee Created",
+          description: "New program fee has been created successfully.",
+        });
+      }
+      setShowFeeDialog(false);
+      resetForm();
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save the fee. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteFee = async (feeId: string) => {
+    try {
+      await deleteFee(feeId);
+      setFees(prev => prev.filter(fee => fee.id !== feeId));
+      toast({
+        title: "Fee Deleted",
+        description: "Program fee has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the fee. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -127,7 +254,7 @@ export default function ProgramFeesTracker() {
               <p className="text-sm text-gray-600">{resident.firstName} {resident.lastInitial}.</p>
             </div>
           </div>
-          <Button data-testid="add-fee-button">
+          <Button onClick={handleAddFee} data-testid="add-fee-button">
             <Plus className="w-4 h-4 mr-2" />
             Add Fee
           </Button>
@@ -141,7 +268,7 @@ export default function ProgramFeesTracker() {
               <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">No Fees Recorded</h4>
               <p className="text-gray-600 mb-4">Track program fees, rent, fines, and other financial obligations.</p>
-              <Button data-testid="add-first-fee">
+              <Button onClick={handleAddFee} data-testid="add-first-fee">
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Fee
               </Button>
@@ -173,17 +300,38 @@ export default function ProgramFeesTracker() {
                     </Badge>
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      <span data-testid="due-date">Due: {formatDate(fee.dueDate)}</span>
-                    </div>
-                    {fee.paidDate && (
-                      <div className="flex items-center text-green-600">
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        <span data-testid="paid-date">Paid: {formatDate(fee.paidDate)}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        <span data-testid="due-date">Due: {formatDate(fee.dueDate)}</span>
                       </div>
-                    )}
+                      {fee.paidDate && (
+                        <div className="flex items-center text-green-600">
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          <span data-testid="paid-date">Paid: {formatDate(fee.paidDate)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditFee(fee)}
+                        data-testid={`edit-fee-${fee.id}`}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteFee(fee.id)}
+                        data-testid={`delete-fee-${fee.id}`}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -191,6 +339,99 @@ export default function ProgramFeesTracker() {
           </div>
         )}
       </main>
+
+      {/* Fee Dialog */}
+      <Dialog open={showFeeDialog} onOpenChange={setShowFeeDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingFee ? 'Edit Program Fee' : 'Add New Program Fee'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="feeType">Fee Type</Label>
+              <Select value={formData.feeType} onValueChange={(value: 'rent' | 'program_fee' | 'fine' | 'deposit' | 'other') => setFormData(prev => ({ ...prev, feeType: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rent">Rent</SelectItem>
+                  <SelectItem value="program_fee">Program Fee</SelectItem>
+                  <SelectItem value="fine">Fine</SelectItem>
+                  <SelectItem value="deposit">Deposit</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="amount">Amount</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={formData.status} onValueChange={(value: 'pending' | 'paid' | 'overdue' | 'waived') => setFormData(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="waived">Waived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paidDate">Paid Date</Label>
+                <Input
+                  id="paidDate"
+                  type="date"
+                  value={formData.paidDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, paidDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes (optional)"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFeeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveFee} disabled={isSaving || !formData.amount || !formData.dueDate}>
+              {isSaving ? 'Saving...' : editingFee ? 'Update Fee' : 'Create Fee'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

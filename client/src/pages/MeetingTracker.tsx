@@ -4,8 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Users, Calendar, Clock, MapPin } from "lucide-react";
-import { getResident, getMeetingsByResident } from "@/lib/api";
+import { getResident, getMeetingsByResident, createMeeting, updateMeeting, deleteMeeting, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Meeting } from "@shared/schema";
 
@@ -15,7 +20,19 @@ export default function MeetingTracker() {
   const [resident, setResident] = useState<Resident | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showMeetingDialog, setShowMeetingDialog] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    meetingType: 'aa' as 'aa' | 'na' | 'group_therapy' | 'individual_counseling' | 'house_meeting' | 'other',
+    dateAttended: '',
+    duration: '',
+    location: '',
+    notes: ''
+  });
 
   useEffect(() => {
     if (id) {
@@ -52,6 +69,111 @@ export default function MeetingTracker() {
 
   const handleGoBack = () => {
     setLocation(`/resident/${id}/trackers`);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      meetingType: 'aa',
+      dateAttended: '',
+      duration: '',
+      location: '',
+      notes: ''
+    });
+    setEditingMeeting(null);
+  };
+
+  const handleAddMeeting = () => {
+    resetForm();
+    setShowMeetingDialog(true);
+  };
+
+  const handleEditMeeting = (meeting: Meeting) => {
+    setFormData({
+      meetingType: meeting.meetingType,
+      dateAttended: meeting.dateAttended,
+      duration: meeting.duration ? meeting.duration.toString() : '',
+      location: meeting.location || '',
+      notes: meeting.notes || ''
+    });
+    setEditingMeeting(meeting);
+    setShowMeetingDialog(true);
+  };
+
+  const handleSaveMeeting = async () => {
+    if (!id) return;
+    
+    const currentUser = getCurrentUser();
+    if (!currentUser || !currentUser.houseId) {
+      toast({
+        title: "Authentication Error",
+        description: "Unable to identify current user. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      if (editingMeeting) {
+        // Update existing meeting
+        const updatedMeeting = await updateMeeting(editingMeeting.id, {
+          meetingType: formData.meetingType,
+          dateAttended: formData.dateAttended,
+          duration: formData.duration ? parseInt(formData.duration) : undefined,
+          location: formData.location || undefined,
+          notes: formData.notes || undefined
+        });
+        setMeetings(prev => prev.map(meeting => meeting.id === editingMeeting.id ? updatedMeeting : meeting));
+        toast({
+          title: "Meeting Updated",
+          description: "Meeting has been updated successfully.",
+        });
+      } else {
+        // Create new meeting
+        const newMeeting = await createMeeting({
+          residentId: id,
+          houseId: currentUser.houseId,
+          createdBy: currentUser.id,
+          meetingType: formData.meetingType,
+          dateAttended: formData.dateAttended,
+          duration: formData.duration ? parseInt(formData.duration) : undefined,
+          location: formData.location || undefined,
+          notes: formData.notes || undefined
+        });
+        setMeetings(prev => [...prev, newMeeting]);
+        toast({
+          title: "Meeting Created",
+          description: "New meeting has been created successfully.",
+        });
+      }
+      setShowMeetingDialog(false);
+      resetForm();
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save the meeting. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteMeeting = async (meetingId: string) => {
+    try {
+      await deleteMeeting(meetingId);
+      setMeetings(prev => prev.filter(meeting => meeting.id !== meetingId));
+      toast({
+        title: "Meeting Deleted",
+        description: "Meeting has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the meeting. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getMeetingTypeColor = (type: string) => {
@@ -121,7 +243,7 @@ export default function MeetingTracker() {
               <p className="text-sm text-gray-600">{resident.firstName} {resident.lastInitial}.</p>
             </div>
           </div>
-          <Button data-testid="add-meeting-button">
+          <Button onClick={handleAddMeeting} data-testid="add-meeting-button">
             <Plus className="w-4 h-4 mr-2" />
             Add Meeting
           </Button>
@@ -135,7 +257,7 @@ export default function MeetingTracker() {
               <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">No Meetings Recorded</h4>
               <p className="text-gray-600 mb-4">Track attendance at recovery meetings and therapy sessions.</p>
-              <Button data-testid="add-first-meeting">
+              <Button onClick={handleAddMeeting} data-testid="add-first-meeting">
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Meeting
               </Button>
@@ -161,21 +283,42 @@ export default function MeetingTracker() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      <span data-testid="meeting-date">{formatDate(meeting.dateAttended)}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      <span data-testid="meeting-duration">{formatDuration(meeting.duration)}</span>
-                    </div>
-                    {meeting.location && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                       <div className="flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span data-testid="meeting-location">{meeting.location}</span>
+                        <Calendar className="w-4 h-4 mr-1" />
+                        <span data-testid="meeting-date">{formatDate(meeting.dateAttended)}</span>
                       </div>
-                    )}
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-1" />
+                        <span data-testid="meeting-duration">{formatDuration(meeting.duration)}</span>
+                      </div>
+                      {meeting.location && (
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          <span data-testid="meeting-location">{meeting.location}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditMeeting(meeting)}
+                        data-testid={`edit-meeting-${meeting.id}`}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteMeeting(meeting.id)}
+                        data-testid={`delete-meeting-${meeting.id}`}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -183,6 +326,83 @@ export default function MeetingTracker() {
           </div>
         )}
       </main>
+
+      {/* Meeting Dialog */}
+      <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingMeeting ? 'Edit Meeting' : 'Add New Meeting'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="meetingType">Meeting Type</Label>
+              <Select value={formData.meetingType} onValueChange={(value: 'aa' | 'na' | 'group_therapy' | 'individual_counseling' | 'house_meeting' | 'other') => setFormData(prev => ({ ...prev, meetingType: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aa">AA Meeting</SelectItem>
+                  <SelectItem value="na">NA Meeting</SelectItem>
+                  <SelectItem value="group_therapy">Group Therapy</SelectItem>
+                  <SelectItem value="individual_counseling">Individual Counseling</SelectItem>
+                  <SelectItem value="house_meeting">House Meeting</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="dateAttended">Date Attended</Label>
+                <Input
+                  id="dateAttended"
+                  type="date"
+                  value={formData.dateAttended}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dateAttended: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  value={formData.duration}
+                  onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
+                  placeholder="60"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={formData.location}
+                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="Meeting location (optional)"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes (optional)"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveMeeting} disabled={isSaving || !formData.dateAttended}>
+              {isSaving ? 'Saving...' : editingMeeting ? 'Update Meeting' : 'Create Meeting'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

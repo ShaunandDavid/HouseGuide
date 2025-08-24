@@ -4,8 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, Target, Calendar, Flag } from "lucide-react";
-import { getResident, getGoalsByResident } from "@/lib/api";
+import { getResident, getGoalsByResident, createGoal, updateGoal, deleteGoal, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Goal } from "@shared/schema";
 
@@ -15,7 +20,19 @@ export default function GoalTracker() {
   const [resident, setResident] = useState<Resident | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showGoalDialog, setShowGoalDialog] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'low' as 'low' | 'medium' | 'high',
+    status: 'not_started' as 'not_started' | 'in_progress' | 'paused' | 'completed',
+    deadline: ''
+  });
 
   useEffect(() => {
     if (id) {
@@ -68,6 +85,111 @@ export default function GoalTracker() {
       case 'high': return 'bg-red-100 text-red-800';
       case 'medium': return 'bg-orange-100 text-orange-800';
       default: return 'bg-blue-100 text-blue-800';
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      priority: 'low',
+      status: 'not_started',
+      deadline: ''
+    });
+    setEditingGoal(null);
+  };
+
+  const handleAddGoal = () => {
+    resetForm();
+    setShowGoalDialog(true);
+  };
+
+  const handleEditGoal = (goal: Goal) => {
+    setFormData({
+      title: goal.title,
+      description: goal.description || '',
+      priority: goal.priority,
+      status: goal.status,
+      deadline: goal.targetDate || ''
+    });
+    setEditingGoal(goal);
+    setShowGoalDialog(true);
+  };
+
+  const handleSaveGoal = async () => {
+    if (!id) return;
+    
+    const currentUser = getCurrentUser();
+    if (!currentUser || !currentUser.houseId) {
+      toast({
+        title: "Authentication Error",
+        description: "Unable to identify current user. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      if (editingGoal) {
+        // Update existing goal
+        const updatedGoal = await updateGoal(editingGoal.id, {
+          title: formData.title,
+          description: formData.description,
+          priority: formData.priority,
+          status: formData.status,
+          targetDate: formData.deadline || undefined
+        });
+        setGoals(prev => prev.map(goal => goal.id === editingGoal.id ? updatedGoal : goal));
+        toast({
+          title: "Goal Updated",
+          description: "Goal has been updated successfully.",
+        });
+      } else {
+        // Create new goal
+        const newGoal = await createGoal({
+          residentId: id,
+          houseId: currentUser.houseId,
+          createdBy: currentUser.id,
+          title: formData.title,
+          description: formData.description,
+          priority: formData.priority,
+          status: formData.status,
+          targetDate: formData.deadline || undefined
+        });
+        setGoals(prev => [...prev, newGoal]);
+        toast({
+          title: "Goal Created",
+          description: "New goal has been created successfully.",
+        });
+      }
+      setShowGoalDialog(false);
+      resetForm();
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save the goal. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    try {
+      await deleteGoal(goalId);
+      setGoals(prev => prev.filter(goal => goal.id !== goalId));
+      toast({
+        title: "Goal Deleted",
+        description: "Goal has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the goal. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -126,7 +248,7 @@ export default function GoalTracker() {
               <p className="text-sm text-gray-600">{resident.firstName} {resident.lastInitial}.</p>
             </div>
           </div>
-          <Button data-testid="add-goal-button">
+          <Button onClick={handleAddGoal} data-testid="add-goal-button">
             <Plus className="w-4 h-4 mr-2" />
             Add Goal
           </Button>
@@ -140,7 +262,7 @@ export default function GoalTracker() {
               <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">No Goals Set</h4>
               <p className="text-gray-600 mb-4">Start tracking progress by setting the first goal.</p>
-              <Button data-testid="add-first-goal">
+              <Button onClick={handleAddGoal} data-testid="add-first-goal">
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Goal
               </Button>
@@ -173,9 +295,30 @@ export default function GoalTracker() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    <span data-testid="goal-deadline">{formatDate(goal.targetDate)}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-sm text-gray-500">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      <span data-testid="goal-deadline">{formatDate(goal.targetDate)}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditGoal(goal)}
+                        data-testid={`edit-goal-${goal.id}`}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteGoal(goal.id)}
+                        data-testid={`delete-goal-${goal.id}`}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -183,6 +326,84 @@ export default function GoalTracker() {
           </div>
         )}
       </main>
+
+      {/* Goal Dialog */}
+      <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingGoal ? 'Edit Goal' : 'Add New Goal'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter goal title"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter goal description"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={formData.priority} onValueChange={(value: 'low' | 'medium' | 'high') => setFormData(prev => ({ ...prev, priority: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={formData.status} onValueChange={(value: 'not_started' | 'in_progress' | 'paused' | 'completed') => setFormData(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not Started</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="deadline">Target Date</Label>
+              <Input
+                id="deadline"
+                type="date"
+                value={formData.deadline}
+                onChange={(e) => setFormData(prev => ({ ...prev, deadline: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGoalDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveGoal} disabled={isSaving || !formData.title}>
+              {isSaving ? 'Saving...' : editingGoal ? 'Update Goal' : 'Create Goal'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

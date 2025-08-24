@@ -28,13 +28,13 @@
 - [ ] Click to view functionality for each entry
 
 ### Persist ALL Trackers
-- [ ] Mirror Checklist's persistence for Goals
-- [ ] Mirror Checklist's persistence for Chores
-- [ ] Mirror Checklist's persistence for Accomplishments
-- [ ] Mirror Checklist's persistence for Incidents
-- [ ] Mirror Checklist's persistence for Meetings
-- [ ] Mirror Checklist's persistence for Fees
-- [ ] On save, create record with metadata: { id, residentId, houseId, createdBy, createdAt, data }
+- [x] Mirror Checklist's persistence for Goals
+- [x] Mirror Checklist's persistence for Chores
+- [x] Mirror Checklist's persistence for Accomplishments
+- [x] Mirror Checklist's persistence for Incidents
+- [x] Mirror Checklist's persistence for Meetings
+- [x] Mirror Checklist's persistence for Fees
+- [x] On save, create record with metadata: { id, residentId, houseId, createdBy, createdAt, data }
 
 ### Notes & OCR
 - [ ] Open Note → create/save note in Notes

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Save, CheckSquare, User, Home, Book, Stethoscope, Briefcase } from "lucide-react";
-import { getResident, getChecklistByResident, createOrUpdateChecklist } from "@/lib/api";
+import { getResident, getChecklistByResident, createOrUpdateChecklist, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Checklist } from "@shared/schema";
 
@@ -98,10 +98,22 @@ export default function ChecklistTracker() {
   const handleSave = async () => {
     if (!id) return;
     
+    const currentUser = getCurrentUser();
+    if (!currentUser || !currentUser.houseId) {
+      toast({
+        title: "Authentication Error",
+        description: "Unable to identify current user. Please log in again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsSaving(true);
     try {
       const savedChecklist = await createOrUpdateChecklist({
-        resident: id,
+        residentId: id,
+        houseId: currentUser.houseId,
+        createdBy: currentUser.id,
         ...formData,
         lastUpdated: new Date().toISOString()
       });
