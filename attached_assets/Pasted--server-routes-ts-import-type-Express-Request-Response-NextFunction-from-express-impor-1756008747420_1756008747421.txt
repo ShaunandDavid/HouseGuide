@@ -1,0 +1,704 @@
+// server/routes.ts
+import type { Express, Request, Response, NextFunction } from "express";
+import { createServer, type Server } from "http";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { storage } from "./storage";
+import { sendEmail, generateVerificationEmail } from "./email";
+import {
+  insertGuideSchema, insertHouseSchema, insertResidentSchema, insertFileSchema,
+  insertReportSchema, insertGoalSchema, insertChecklistSchema, insertChoreSchema,
+  insertAccomplishmentSchema, insertIncidentSchema, insertMeetingSchema,
+  insertProgramFeeSchema, insertNoteSchema,
+} from "@shared/schema";
+
+// ---------- Config Guards ----------
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error("JWT_SECRET missing/too short (>=32 chars required).");
+}
+
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+const IS_PROD = NODE_ENV === "production";
+
+// ---------- Types ----------
+interface AuthTokenPayload {
+  userId: string;
+  email: string;
+  houseId: string;
+}
+
+interface AuthedRequest extends Request {
+  guide?: Awaited<ReturnType<typeof storage.getGuide>>;
+}
+
+// ---------- Helpers ----------
+function signAuthToken(payload: AuthTokenPayload) {
+  return jwt.sign(payload, JWT_SECRET!, { expiresIn: "24h" });
+}
+
+function verifyAuthToken(token: string): AuthTokenPayload {
+  return jwt.verify(token, JWT_SECRET!) as AuthTokenPayload;
+}
+
+function cookieOpts() {
+  // For cross-site cookies, browser requires: secure:true + sameSite:'none'
+  // In dev (http://localhost), we fall back to Lax so local testing works.
+  return {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: (IS_PROD ? "none" : "lax") as "none" | "lax",
+    path: "/",
+    maxAge: 24 * 60 * 60 * 1000,
+  };
+}
+
+function sendServerError(res: Response, msg = "Internal server error") {
+  return res.status(500).json({ error: msg });
+}
+
+// ---------- Auth Middleware ----------
+async function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
+  try {
+    const token = req.cookies?.authToken;
+    if (!token) return res.status(401).json({ error: "Authentication required" });
+
+    let decoded: AuthTokenPayload;
+    try {
+      decoded = verifyAuthToken(token);
+    } catch (e: any) {
+      if (e?.name === "TokenExpiredError") {
+        return res.status(401).json({ error: "TOKEN_EXPIRED" });
+      }
+      return res.status(401).json({ error: "TOKEN_VERIFY_FAIL" });
+    }
+
+    const guide = await storage.getGuide(decoded.userId);
+    if (!guide) return res.status(401).json({ error: "NOT_FOUND" });
+    if (!guide.isEmailVerified) return res.status(401).json({ error: "UNVERIFIED_EMAIL" });
+
+    req.guide = guide;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Authentication failed" });
+  }
+}
+
+// ---------- Routes ----------
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Health
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", env: NODE_ENV, ts: new Date().toISOString() });
+  });
+
+  // Whoami (cookie transport sanity-check)
+  app.get("/api/whoami", requireAuth, (req: AuthedRequest, res) => {
+    res.json({ ok: true, user: req.guide?.email });
+  });
+
+  // -------- Auth --------
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body ?? {};
+      if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+
+      // DB pulse
+      try {
+        const houses = await storage.getAllHouses();
+        console.log(`LOGIN DB OK • houses=${houses.length || 0}`);
+      } catch {
+        console.log("LOGIN DB fallback/in-memory storage");
+      }
+
+      const guide = await storage.getGuideByEmail(email);
+      if (!guide) return res.status(401).json({ error: "NOT_FOUND: Invalid credentials" });
+      if (!guide.isEmailVerified) {
+        return res.status(403).json({ error: "UNVERIFIED_EMAIL: Verify before signing in", requiresVerification: true });
+      }
+
+      const passOk = await bcrypt.compare(password, guide.password);
+      if (!passOk) return res.status(401).json({ error: "INVALID_PASSWORD: Invalid credentials" });
+
+      if (!guide.houseId) return res.status(500).json({ error: "Account setup incomplete. Contact support." });
+
+      const house = await storage.getHouse(guide.houseId);
+      if (!house) return res.status(500).json({ error: "Facility not found. Contact support." });
+
+      const token = signAuthToken({ userId: guide.id, email: guide.email, houseId: guide.houseId });
+      const { password: _pw, ...userWithoutPassword } = guide;
+
+      res.cookie("authToken", token, cookieOpts());
+      return res.json({ success: true, user: userWithoutPassword });
+    } catch (err) {
+      console.error("LOGIN ERROR:", err);
+      return sendServerError(res, "Authentication failed");
+    }
+  });
+
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    try {
+      const data = insertGuideSchema.parse(req.body);
+
+      const exists = await storage.getGuideByEmail(data.email);
+      if (exists) return res.status(409).json({ error: "User already exists" });
+
+      // Create house first
+      const house = await storage.createHouse({
+        name: data.houseName,
+        address: "",
+        phone: "",
+        email: data.email,
+      });
+
+      const hashed = await bcrypt.hash(data.password, 12);
+      const guide = await storage.createGuide({
+        ...data,
+        password: hashed,
+        houseId: house.id,
+      });
+
+      // Send verification email
+      const proto = IS_PROD ? "https" : "http";
+      const host = req.headers.host;
+      const baseUrl = `${proto}://${host}`;
+
+      if (guide.verificationToken) {
+        const params = generateVerificationEmail(
+          guide.email,
+          guide.verificationToken,
+          guide.houseName,
+          baseUrl
+        );
+        const ok = await sendEmail(params);
+        if (!ok) console.error("SIGNUP: failed to send verification email");
+      }
+
+      return res.status(201).json({
+        success: true,
+        requiresVerification: true,
+        message: "Registration successful. Check your email to verify.",
+      });
+    } catch (err) {
+      console.error("SIGNUP ERROR:", err);
+      return sendServerError(res, "Registration failed");
+    }
+  });
+
+  app.get("/api/auth/verify-email", async (req: Request, res: Response) => {
+    try {
+      const token = typeof req.query.token === "string" ? req.query.token : "";
+      if (!token) return res.status(400).json({ error: "Verification token is required" });
+
+      const guide = await storage.getGuideByVerificationToken(token);
+      if (!guide) return res.status(404).json({ error: "Invalid or expired verification token" });
+      if (guide.isEmailVerified) {
+        return res.json({ success: true, message: "Email already verified. You can sign in." });
+      }
+
+      await storage.updateGuide(guide.id, { isEmailVerified: true, verificationToken: undefined });
+      return res.json({ success: true, message: "Email verified. You can now sign in." });
+    } catch (err) {
+      console.error("VERIFY ERROR:", err);
+      return sendServerError(res, "Verification failed");
+    }
+  });
+
+  app.post("/api/auth/logout", (_req, res) => {
+    res.clearCookie("authToken", { path: "/" });
+    return res.json({ success: true });
+  });
+
+  // -------- Houses (protected) --------
+  app.get("/api/houses/:idOrName", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { idOrName } = req.params;
+      if (!idOrName || idOrName.length > 80) return res.status(400).json({ error: "Invalid house identifier" });
+
+      let house = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrName)
+        ? await storage.getHouse(idOrName)
+        : null;
+      if (!house) house = await storage.getHouseByName(idOrName);
+      if (!house) return res.status(404).json({ error: "House not found" });
+      return res.json(house);
+    } catch (err) {
+      if (!IS_PROD) console.error("Get house error:", err);
+      return sendServerError(res, "Failed to fetch house");
+    }
+  });
+
+  app.post("/api/houses", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertHouseSchema.parse(req.body);
+      const house = await storage.createHouse(data);
+      return res.status(201).json(house);
+    } catch (err) {
+      if (!IS_PROD) console.error("Create house error:", err);
+      return sendServerError(res, "Failed to create house");
+    }
+  });
+
+  app.get("/api/houses", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const houses = await storage.getAllHouses();
+      return res.json(houses);
+    } catch (err) {
+      if (!IS_PROD) console.error("Get houses error:", err);
+      return sendServerError(res, "Failed to fetch houses");
+    }
+  });
+
+  // -------- Residents --------
+  app.get("/api/residents/by-house/:houseId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { houseId } = req.params;
+      if (!houseId || houseId.length > 50) return res.status(400).json({ error: "Invalid house ID" });
+      const residents = await storage.getResidentsByHouse(houseId);
+      return res.json(residents);
+    } catch (err) {
+      if (!IS_PROD) console.error("Get residents error:", err);
+      return sendServerError(res, "Failed to fetch residents");
+    }
+  });
+
+  app.get("/api/residents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      if (!id || id.length > 50) return res.status(400).json({ error: "Invalid resident ID" });
+      const resident = await storage.getResident(id);
+      if (!resident) return res.status(404).json({ error: "Resident not found" });
+      return res.json(resident);
+    } catch (err) {
+      if (!IS_PROD) console.error("Get resident error:", err);
+      return sendServerError(res, "Failed to fetch resident");
+    }
+  });
+
+  app.post("/api/residents", requireAuth, async (req: AuthedRequest, res: Response) => {
+    try {
+      const data = insertResidentSchema.parse(req.body);
+      // Enforce house scoping
+      const resident = await storage.createResident({ ...data, house: req.guide!.houseId! });
+      return res.status(201).json(resident);
+    } catch (err) {
+      if (!IS_PROD) console.error("Create resident error:", err);
+      return sendServerError(res, "Failed to create resident");
+    }
+  });
+
+  app.patch("/api/residents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertResidentSchema.partial().parse(req.body);
+      const resident = await storage.updateResident(id, data);
+      return res.json(resident);
+    } catch (err) {
+      if (!IS_PROD) console.error("Update resident error:", err);
+      return sendServerError(res, "Failed to update resident");
+    }
+  });
+
+  app.delete("/api/residents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteResident(id);
+      return res.status(204).send();
+    } catch (err) {
+      if (!IS_PROD) console.error("Delete resident error:", err);
+      return sendServerError(res, "Failed to delete resident");
+    }
+  });
+
+  // -------- Files --------
+  app.post("/api/files", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertFileSchema.parse(req.body);
+      const file = await storage.createFile(data);
+      return res.status(201).json(file);
+    } catch (err) {
+      if (!IS_PROD) console.error("Create file error:", err);
+      return sendServerError(res, "Failed to create file");
+    }
+  });
+
+  app.get("/api/files/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const files = await storage.getFilesByResident(residentId);
+      return res.json(files);
+    } catch (err) {
+      if (!IS_PROD) console.error("Get files error:", err);
+      return sendServerError(res, "Failed to fetch files");
+    }
+  });
+
+  app.delete("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteFile(id);
+      return res.status(204).send();
+    } catch (err) {
+      if (!IS_PROD) console.error("Delete file error:", err);
+      return sendServerError(res, "Failed to delete file");
+    }
+  });
+
+  // -------- Reports --------
+  app.post("/api/reports", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertReportSchema.parse(req.body);
+      const existing = await storage.getReportByResidentAndWeek(data.resident, data.weekStart);
+      const report = existing
+        ? await storage.updateReport(existing.id, data)
+        : await storage.createReport(data);
+      return res.json(report);
+    } catch (err) {
+      if (!IS_PROD) console.error("Create/update report error:", err);
+      return sendServerError(res, "Failed to create/update report");
+    }
+  });
+
+  app.get("/api/reports/:residentId/:weekStart", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId, weekStart } = req.params;
+      const report = await storage.getReportByResidentAndWeek(residentId, weekStart);
+      return res.json(report);
+    } catch (err) {
+      if (!IS_PROD) console.error("Get report error:", err);
+      return sendServerError(res, "Failed to fetch report");
+    }
+  });
+
+  // -------- Goals --------
+  app.get("/api/goals/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const goals = await storage.getGoalsByResident(residentId);
+      return res.json(goals);
+    } catch (err) {
+      console.error("Get goals error:", err);
+      return sendServerError(res, "Failed to fetch goals");
+    }
+  });
+
+  app.post("/api/goals", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertGoalSchema.parse(req.body);
+      const goal = await storage.createGoal(data);
+      return res.status(201).json(goal);
+    } catch (err) {
+      console.error("Create goal error:", err);
+      return sendServerError(res, "Failed to create goal");
+    }
+  });
+
+  app.patch("/api/goals/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertGoalSchema.partial().parse(req.body);
+      const goal = await storage.updateGoal(id, data);
+      return res.json(goal);
+    } catch (err) {
+      console.error("Update goal error:", err);
+      return sendServerError(res, "Failed to update goal");
+    }
+  });
+
+  app.delete("/api/goals/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteGoal(id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete goal error:", err);
+      return sendServerError(res, "Failed to delete goal");
+    }
+  });
+
+  // -------- Checklists --------
+  app.get("/api/checklists/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const checklist = await storage.getChecklistByResident(residentId);
+      return res.json(checklist);
+    } catch (err) {
+      console.error("Get checklist error:", err);
+      return sendServerError(res, "Failed to fetch checklist");
+    }
+  });
+
+  app.post("/api/checklists", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertChecklistSchema.parse(req.body);
+      const existing = await storage.getChecklistByResident(data.resident);
+      const checklist = existing
+        ? await storage.updateChecklist(existing.id, data)
+        : await storage.createChecklist(data);
+      return res.json(checklist);
+    } catch (err) {
+      console.error("Save checklist error:", err);
+      return sendServerError(res, "Failed to save checklist");
+    }
+  });
+
+  // -------- Chores --------
+  app.get("/api/chores/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const chores = await storage.getChoresByResident(residentId);
+      return res.json(chores);
+    } catch (err) {
+      console.error("Get chores error:", err);
+      return sendServerError(res, "Failed to fetch chores");
+    }
+  });
+
+  app.post("/api/chores", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertChoreSchema.parse(req.body);
+      const chore = await storage.createChore(data);
+      return res.status(201).json(chore);
+    } catch (err) {
+      console.error("Create chore error:", err);
+      return sendServerError(res, "Failed to create chore");
+    }
+  });
+
+  app.patch("/api/chores/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertChoreSchema.partial().parse(req.body);
+      const chore = await storage.updateChore(id, data);
+      return res.json(chore);
+    } catch (err) {
+      console.error("Update chore error:", err);
+      return sendServerError(res, "Failed to update chore");
+    }
+  });
+
+  app.delete("/api/chores/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteChore(id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete chore error:", err);
+      return sendServerError(res, "Failed to delete chore");
+    }
+  });
+
+  // -------- Accomplishments --------
+  app.get("/api/accomplishments/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const accomplishments = await storage.getAccomplishmentsByResident(residentId);
+      return res.json(accomplishments);
+    } catch (err) {
+      console.error("Get accomplishments error:", err);
+      return sendServerError(res, "Failed to fetch accomplishments");
+    }
+  });
+
+  app.post("/api/accomplishments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertAccomplishmentSchema.parse(req.body);
+      const accomplishment = await storage.createAccomplishment(data);
+      return res.status(201).json(accomplishment);
+    } catch (err) {
+      console.error("Create accomplishment error:", err);
+      return sendServerError(res, "Failed to create accomplishment");
+    }
+  });
+
+  app.patch("/api/accomplishments/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertAccomplishmentSchema.partial().parse(req.body);
+      const accomplishment = await storage.updateAccomplishment(id, data);
+      return res.json(accomplishment);
+    } catch (err) {
+      console.error("Update accomplishment error:", err);
+      return sendServerError(res, "Failed to update accomplishment");
+    }
+  });
+
+  app.delete("/api/accomplishments/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteAccomplishment(id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete accomplishment error:", err);
+      return sendServerError(res, "Failed to delete accomplishment");
+    }
+  });
+
+  // -------- Incidents --------
+  app.get("/api/incidents/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const incidents = await storage.getIncidentsByResident(residentId);
+      return res.json(incidents);
+    } catch (err) {
+      console.error("Get incidents error:", err);
+      return sendServerError(res, "Failed to fetch incidents");
+    }
+  });
+
+  app.post("/api/incidents", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertIncidentSchema.parse(req.body);
+      const incident = await storage.createIncident(data);
+      return res.status(201).json(incident);
+    } catch (err) {
+      console.error("Create incident error:", err);
+      return sendServerError(res, "Failed to create incident");
+    }
+  });
+
+  app.patch("/api/incidents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertIncidentSchema.partial().parse(req.body);
+      const incident = await storage.updateIncident(id, data);
+      return res.json(incident);
+    } catch (err) {
+      console.error("Update incident error:", err);
+      return sendServerError(res, "Failed to update incident");
+    }
+  });
+
+  app.delete("/api/incidents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteIncident(id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete incident error:", err);
+      return sendServerError(res, "Failed to delete incident");
+    }
+  });
+
+  // -------- Meetings --------
+  app.get("/api/meetings/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const meetings = await storage.getMeetingsByResident(residentId);
+      return res.json(meetings);
+    } catch (err) {
+      console.error("Get meetings error:", err);
+      return sendServerError(res, "Failed to fetch meetings");
+    }
+  });
+
+  app.post("/api/meetings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertMeetingSchema.parse(req.body);
+      const meeting = await storage.createMeeting(data);
+      return res.status(201).json(meeting);
+    } catch (err) {
+      console.error("Create meeting error:", err);
+      return sendServerError(res, "Failed to create meeting");
+    }
+  });
+
+  app.patch("/api/meetings/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertMeetingSchema.partial().parse(req.body);
+      const meeting = await storage.updateMeeting(id, data);
+      return res.json(meeting);
+    } catch (err) {
+      console.error("Update meeting error:", err);
+      return sendServerError(res, "Failed to update meeting");
+    }
+  });
+
+  app.delete("/api/meetings/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteMeeting(id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete meeting error:", err);
+      return sendServerError(res, "Failed to delete meeting");
+    }
+  });
+
+  // -------- Program Fees --------
+  app.get("/api/fees/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const fees = await storage.getProgramFeesByResident(residentId);
+      return res.json(fees);
+    } catch (err) {
+      console.error("Get fees error:", err);
+      return sendServerError(res, "Failed to fetch fees");
+    }
+  });
+
+  app.post("/api/fees", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertProgramFeeSchema.parse(req.body);
+      const fee = await storage.createProgramFee(data);
+      return res.status(201).json(fee);
+    } catch (err) {
+      console.error("Create fee error:", err);
+      return sendServerError(res, "Failed to create fee");
+    }
+  });
+
+  app.patch("/api/fees/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const data = insertProgramFeeSchema.partial().parse(req.body);
+      const fee = await storage.updateProgramFee(id, data);
+      return res.json(fee);
+    } catch (err) {
+      console.error("Update fee error:", err);
+      return sendServerError(res, "Failed to update fee");
+    }
+  });
+
+  app.delete("/api/fees/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProgramFee(id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete fee error:", err);
+      return sendServerError(res, "Failed to delete fee");
+    }
+  });
+
+  // -------- Notes --------
+  app.get("/api/notes/by-resident/:residentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { residentId } = req.params;
+      const notes = await storage.getNotesByResident(residentId);
+      return res.json(notes);
+    } catch (err) {
+      console.error("Get notes error:", err);
+      return sendServerError(res, "Failed to fetch notes");
+    }
+  });
+
+  app.post("/api/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = insertNoteSchema.parse(req.body);
+      const note = await storage.createNote(data);
+      return res.status(201).json(note);
+    } catch (err) {
+      console.error("Create note error:", err);
+      return sendServerError(res, "Failed to create note");
+    }
+  });
+
+  // -------- Global error fence --------
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("UNCAUGHT ERROR:", err);
+    return sendServerError(res);
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
