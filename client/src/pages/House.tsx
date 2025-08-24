@@ -153,9 +153,9 @@ export default function House() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900" data-testid="house-name">
-                {house?.name ?? 'Loading House'} House
+                {house?.name?.includes('Dashboard') ? house.name.replace('Dashboard', 'Facility') : (house?.name ?? 'Loading...')}
               </h2>
-              <p className="text-sm text-gray-600">Residential Care Facility</p>
+              <p className="text-sm text-gray-600">Residential Care Management</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" data-testid="settings-button">
@@ -163,6 +163,37 @@ export default function House() {
           </Button>
         </div>
       </header>
+
+      {/* Setup Section - Show if house name contains 'Dashboard' */}
+      {house?.name?.includes('Dashboard') && (
+        <div className="bg-blue-50 border-b border-blue-200 p-4">
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="pt-6">
+              <div className="flex items-start space-x-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Home className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Complete Your Setup</h3>
+                  <p className="text-gray-600 mb-4">Give your facility a name and start onboarding residents.</p>
+                  <div className="flex items-center space-x-3">
+                    <Button size="sm" variant="outline">
+                      <Settings className="w-4 h-4 mr-2" />
+                      Rename Facility
+                    </Button>
+                    <Link href={`/house/${houseId}/onboard`}>
+                      <Button size="sm">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add First Resident
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 p-4">

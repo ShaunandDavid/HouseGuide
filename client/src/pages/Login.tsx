@@ -38,7 +38,7 @@ export default function Login() {
         description: "Successfully signed in.",
       });
       
-      // Navigate to user's house if they have one, otherwise show error
+      // Navigate to user's dashboard
       if (user.houseId) {
         setLocation(`/house/${user.houseId}`);
       } else {

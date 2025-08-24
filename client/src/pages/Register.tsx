@@ -18,7 +18,6 @@ export default function Register() {
     name: "",
     houseName: ""
   });
-  const [startWithBlankSlate, setStartWithBlankSlate] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [, setLocation] = useLocation();
@@ -71,7 +70,7 @@ export default function Register() {
           email: formData.email,
           password: formData.password,
           name: formData.name,
-          houseName: formData.houseName || `${formData.name}'s House`
+          houseName: `${formData.name}'s Dashboard`
         }),
         credentials: 'include',
       });
@@ -115,7 +114,7 @@ export default function Register() {
                 <Mail className="h-4 w-4" />
                 <AlertDescription>
                   Please check your email and click the verification link to complete your registration. 
-                  Once verified, you can sign in and start managing residents for {formData.houseName}.
+                  Once verified, you can sign in and set up your facility dashboard.
                 </AlertDescription>
               </Alert>
               
@@ -134,7 +133,7 @@ export default function Register() {
                   className="w-full"
                   data-testid="button-register-another"
                 >
-                  Register Another Facility
+                  Register Another Account
                 </Button>
               </div>
             </CardContent>
@@ -152,29 +151,14 @@ export default function Register() {
           <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center">
             <Home className="text-white text-2xl" />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Create Your Facility</h1>
-          <p className="text-gray-600">Set up your residential care management</p>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Join HouseGuide</h1>
+          <p className="text-gray-600">Create your account to get started</p>
         </div>
 
         {/* Registration Form */}
         <Card>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="houseName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Facility Name (optional)
-                </Label>
-                <Input
-                  id="houseName"
-                  type="text"
-                  value={formData.houseName}
-                  onChange={(e) => handleInputChange('houseName', e.target.value)}
-                  placeholder="Leave blank to auto-generate"
-                  disabled={isLoading}
-                  data-testid="input-house-name"
-                />
-                <p className="text-sm text-gray-500 mt-1">Just for organization - you can change this later</p>
-              </div>
 
               <div>
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -236,18 +220,6 @@ export default function Register() {
                 />
               </div>
               
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="blankSlate"
-                  checked={startWithBlankSlate}
-                  onChange={(e) => setStartWithBlankSlate(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <Label htmlFor="blankSlate" className="text-sm font-medium text-gray-700">
-                  Start with blank slate (no sample residents)
-                </Label>
-              </div>
               
               <Button 
                 type="submit" 
