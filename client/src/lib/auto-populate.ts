@@ -1,18 +1,30 @@
-// Auto-populate trackers from OCR text
-import { createGoal, createChore, createIncident, createMeeting, createAccomplishment } from '@/lib/api';
+// Auto-populate trackers and smart notes from OCR text
+import { createGoal, createChore, createIncident, createMeeting, createAccomplishment, createNote } from '@/lib/api';
 
 interface TrackerEntry {
-  type: 'goal' | 'chore' | 'incident' | 'meeting' | 'accomplishment';
+  type: 'goal' | 'chore' | 'incident' | 'meeting' | 'accomplishment' | 'note';
   data: any;
 }
 
-// Keywords for different tracker types
+// Keywords for different tracker types and note categories
 const TRACKER_KEYWORDS = {
   goal: ['goal', 'objective', 'target', 'achieve', 'complete', 'finish', 'work on', 'improve'],
   chore: ['chore', 'clean', 'wash', 'sweep', 'mop', 'vacuum', 'take out', 'organize', 'tidy'],
   incident: ['incident', 'violation', 'warning', 'disciplinary', 'behavior', 'fight', 'conflict', 'inappropriate'],
   meeting: ['meeting', 'group', 'therapy', 'session', 'counseling', 'aa', 'na', 'sponsor', 'appointment'],
   accomplishment: ['completed', 'achieved', 'successful', 'finished', 'passed', 'graduated', 'earned']
+};
+
+// Smart note categorization keywords
+const NOTE_CATEGORIES = {
+  medical: ['doctor', 'medication', 'health', 'medical', 'prescription', 'treatment', 'symptoms', 'clinic', 'hospital'],
+  financial: ['money', 'payment', 'fee', 'cost', 'expense', 'budget', 'debt', 'financial', 'bill', 'invoice'],
+  behavioral: ['behavior', 'attitude', 'emotional', 'mood', 'anger', 'depression', 'anxiety', 'stress'],
+  progress: ['progress', 'improvement', 'development', 'growth', 'milestone', 'advancement', 'step forward'],
+  concern: ['concern', 'worry', 'issue', 'problem', 'challenge', 'difficulty', 'struggle', 'trouble'],
+  contact: ['family', 'visitor', 'call', 'contact', 'communication', 'phone', 'email', 'visit'],
+  legal: ['court', 'legal', 'lawyer', 'attorney', 'case', 'hearing', 'probation', 'violation'],
+  employment: ['job', 'work', 'employment', 'interview', 'employer', 'workplace', 'career', 'resume']
 };
 
 export function parseOCRForTrackers(ocrText: string): TrackerEntry[] {
@@ -87,6 +99,20 @@ export function parseOCRForTrackers(ocrText: string): TrackerEntry[] {
         }
       });
     }
+    
+    // Smart note categorization - check if line contains important information
+    else if (trimmedLine.length > 20) { // Only meaningful content
+      const noteCategory = categorizeNote(trimmedLine);
+      if (noteCategory) {
+        entries.push({
+          type: 'note',
+          data: {
+            text: `[${noteCategory.toUpperCase()}] ${trimmedLine}`,
+            source: 'smart_ocr'
+          }
+        });
+      }
+    }
   }
   
   return entries;
@@ -113,6 +139,23 @@ function extractMeetingType(text: string): string {
   if (text.includes('group')) return 'Group Meeting';
   if (text.includes('sponsor')) return 'Sponsor Meeting';
   return 'General Meeting';
+}
+
+function categorizeNote(text: string): string | null {
+  // Find the best matching note category based on keywords
+  let bestCategory = null;
+  let highestScore = 0;
+  
+  for (const [category, keywords] of Object.entries(NOTE_CATEGORIES)) {
+    const score = keywords.filter(keyword => text.includes(keyword)).length;
+    if (score > highestScore) {
+      highestScore = score;
+      bestCategory = category;
+    }
+  }
+  
+  // Only return category if we have strong confidence
+  return highestScore >= 1 ? bestCategory : null;
 }
 
 export async function autoPopulateTrackers(
@@ -152,6 +195,10 @@ export async function autoPopulateTrackers(
           break;
         case 'accomplishment':
           await createAccomplishment(baseData);
+          created++;
+          break;
+        case 'note':
+          await createNote(baseData);
           created++;
           break;
       }

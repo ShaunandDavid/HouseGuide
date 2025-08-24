@@ -115,12 +115,20 @@ export function DocumentScanModal({
           createdBy: currentUser.id
         });
         
-        // Auto-populate trackers from OCR text
+        // Auto-populate trackers and smart notes from OCR text
         const populateResult = await autoPopulateTrackers(ocrResult, residentId, houseId, currentUser.id);
         if (populateResult.created > 0) {
+          const noteCount = populateResult.entries.filter(e => e.type === 'note').length;
+          const trackerCount = populateResult.created - noteCount;
+          const message = noteCount > 0 && trackerCount > 0 
+            ? `Created ${trackerCount} tracker entries and ${noteCount} smart notes`
+            : noteCount > 0 
+            ? `Created ${noteCount} categorized smart notes`
+            : `Created ${trackerCount} tracker entries`;
+            
           toast({
-            title: "Auto-populated Trackers",
-            description: `Created ${populateResult.created} tracker entries from scanned document`,
+            title: "Auto-populated from OCR",
+            description: message,
           });
         }
       }
