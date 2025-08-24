@@ -119,7 +119,7 @@ export default function Register() {
               
               <div className="mt-6 space-y-4">
                 <Button 
-                  onClick={() => setLocation("/login")} 
+                  onClick={() => setLocation("/")} 
                   className="w-full"
                   data-testid="button-goto-login"
                 >
