@@ -1,0 +1,268 @@
+✅ Final Replit Agent Prompt (ready to paste)
+
+Title: HouseGuide – Client Dashboard Expansion (Sidebar, Persistence, OCR Notes, AI Weekly Report, Voice)
+
+Current State
+
+Client dashboard loads.
+
+Scan Image opens upload; OCR not wired.
+
+Open Note does nothing.
+
+Manage Status works.
+
+View Trackers navigates.
+
+Generate Report supports manual text only.
+
+Trackers: only Checklist persists; others accept input but don’t save.
+
+Goals
+
+Sidebar / Folder Structure (shadcn-style)
+
+Add collapsible sidebar (left) on Client Dashboard with folders:
+
+Weekly Reports
+
+Pictures
+
+Notes (include OCR text from scanned images)
+
+Trackers
+
+Goals, Checklist, Chores, Accomplishments, Incidents, Meetings, Fees
+
+Each folder lists entries (title + timestamp). Click to view.
+
+Persist ALL Trackers
+
+Mirror Checklist’s persistence for Goals/Chores/Accomplishments/Incidents/Meetings/Fees.
+
+On save, create a record under its folder with metadata:
+
+{ id, residentId, houseId, createdBy, createdAt, data }.
+
+Notes & OCR
+
+Open Note → create/save note in Notes.
+
+Scan Image:
+
+Upload image to storage.
+
+Run OCR (async).
+
+Save image in Pictures.
+
+Save extracted text as a linked Note in Notes (link back to image).
+
+Weekly Report (Template + AI Rewrite)
+
+Keep manual entry.
+
+Add Generate Weekly Report (AI).
+
+Backend collects week data (trackers, notes, incidents, meetings, fees, OCR text).
+
+Use existing Weekly Report template strictly—no freestyle. Empty sections → “No updates this week.”
+
+Save AI output in Weekly Reports; allow editing before final save.
+
+AI provider (env-switchable):
+
+Default: GPT4All (local)
+
+Also support Ollama (e.g., llama3.1:8b-instruct) and OpenAI as optional provider.
+
+AI_PROVIDER=gpt4all|ollama|openai
+
+Voice-to-Text
+
+Mic button beside major textareas (Notes, Reports, Trackers).
+
+Desktop: Web Speech API; Mobile: native keyboard dictation.
+
+Graceful fallback.
+
+Implementation Details
+File paths & components
+
+Frontend
+
+client/src/components/ResidentSidebar.tsx (shadcn/ui, collapsible)
+
+client/src/pages/ResidentDashboard.tsx (wraps House/Resident views with sidebar)
+
+client/src/components/ReportEditor.tsx (markdown/textarea + “Generate with AI” + “Save”)
+
+client/src/components/MicInput.tsx (Web Speech API hook + button)
+
+client/src/lib/api.ts (add new API helpers)
+
+Backend
+
+server/routes.ts (new endpoints below)
+
+server/ai/index.ts (provider router)
+
+server/ai/providers/{gpt4all.ts, ollama.ts, openai.ts}
+
+server/templates/weeklyReport.md (use existing template file—read from disk)
+
+server/jobs/{ocrWorker.ts, aiWorker.ts} (queue processors)
+
+API contracts
+
+Weekly Reports
+
+POST /api/reports/weekly/generate
+Body: { residentId, weekStart, weekEnd }
+Returns: { draft: string } (AI text)
+
+POST /api/reports/weekly
+Body: { residentId, weekStart, weekEnd, title, body } → creates report
+
+GET /api/reports/weekly/by-resident/:residentId?from=&to=
+
+Notes & Pictures
+
+POST /api/notes → { residentId, text, source: 'manual'|'ocr', imageId? }
+
+POST /api/files/upload (multipart) → returns { fileId, url } and enqueues OCR
+
+GET /api/files/by-resident/:residentId
+
+GET /api/notes/by-resident/:residentId
+
+Trackers (mirror checklist)
+
+POST /api/{goals|chores|accomplishments|incidents|meetings|fees} → create
+
+GET /api/{…}/by-resident/:residentId → list
+
+PATCH /api/{…}/:id → update
+
+DB models / migrations
+
+weekly_reports: id, residentId, houseId, title, body, weekStart, weekEnd, createdAt, createdBy
+
+notes: id, residentId, houseId, text, source('manual'|'ocr'), imageFileId?, createdAt, createdBy
+
+files: id, residentId, houseId, filename, mime, url, size, createdAt, createdBy
+
+Ensure existing tracker tables have residentId, houseId, createdAt, createdBy.
+
+Background jobs
+
+Use a simple in-process queue (e.g., BullMQ/bee-queue) or an async task runner.
+
+OCR job (ocrWorker.ts): download image → Tesseract (or cloud OCR) → save text as Note (source='ocr') linked to file.
+
+AI job (aiWorker.ts): consolidate week data → call ai.generateWeeklyReport() → return draft to API.
+
+AI provider abstraction
+
+Env:
+
+AI_PROVIDER=gpt4all|ollama|openai
+
+OPENAI_API_KEY (if openai)
+
+OLLAMA_BASE_URL (if ollama)
+
+WEEKLY_REPORT_TEMPLATE_PATH=server/templates/weeklyReport.md
+
+server/ai/index.ts
+
+export async function generateWeeklyReport({ template, resident, weekData, provider }: Args): Promise<string> {
+  // switch on provider; normalize outputs
+}
+
+
+Prompt scaffold (backend):
+
+SYSTEM: You are a clinical documentation assistant. Produce a professional Weekly Report using the provided TEMPLATE exactly. Do not change section names. Write in clear, neutral, objective language. If a section has no data, write “No updates this week.”
+
+TEMPLATE:
+<file: server/templates/weeklyReport.md>
+
+USER:
+Resident: {{resident.name}}
+Week: {{weekStart}} to {{weekEnd}}
+Data sources:
+- Goals: {{goalsJSON}}
+- Incidents: {{incidentsJSON}}
+- Meetings: {{meetingsJSON}}
+- Chores: {{choresJSON}}
+- Checklist: {{checklistJSON}}
+- Fees: {{feesJSON}}
+- Notes (manual + OCR): {{notesJSON}}
+
+Instructions:
+1) Fill each TEMPLATE section with precise, succinct summaries grounded ONLY in the data above.
+2) Use dates where helpful.
+3) Keep factual; no speculation.
+4) Recommendations only if implied by data.
+Return ONLY the completed report text.
+
+Permissions & audit
+
+Reuse requireAuth. Scope all creates/reads by houseId + residentId.
+
+Add createdBy and basic audit log (action, userId, residentId, entity, entityId, ts).
+
+Voice-to-text (frontend)
+
+MicInput.tsx Hook:
+
+Start/stop via Web Speech API.
+
+Insert at cursor; add visual recording state.
+
+Fallback: hide mic if API unavailable.
+
+UX polish
+
+Sidebar: counts, “+ New” per folder.
+
+Report editor: “Regenerate with AI” (idempotent), “Save as Draft/Final”.
+
+Toasts for OCR/AI queued & completed.
+
+Pagination or lazy-load long lists.
+
+Env & feature flags
+
+.env:
+
+AI_PROVIDER=gpt4all
+OPENAI_API_KEY=
+OLLAMA_BASE_URL=http://localhost:11434
+WEEKLY_REPORT_TEMPLATE_PATH=server/templates/weeklyReport.md
+
+
+Flags: allow disabling AI/OCR independently.
+
+Acceptance criteria
+
+Sidebar shows folders; clicking lists entries; open detail works.
+
+All trackers save and appear in their folder; data survives reload.
+
+Open Note creates a note; Scan Image saves image + OCR note linked.
+
+Generate Weekly Report (AI) produces a draft that matches the existing template; editable; saved to Weekly Reports.
+
+Voice mic works where supported; no crashes if unsupported.
+
+Provider switch works across gpt4all | ollama | openai.
+
+Tests / QA
+
+Seed script: create demo house + resident.
+
+API smoke tests: create/list notes/files/trackers/reports.
+
+Manual QA: create data for a week → AI generate → verify sections filled or “No updates this week”.
