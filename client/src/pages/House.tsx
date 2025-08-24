@@ -49,12 +49,12 @@ export default function House() {
     
     setIsLoading(true);
     try {
-      // Load house data
+      // Load house data - houseId is actually the house ID from the URL
       const houseData = await getHouseByName(houseId);
       setHouse(houseData);
 
       // Load residents
-      const residentsData = await getResidentsByHouse(houseData.id);
+      const residentsData = await getResidentsByHouse(houseId);
       
       // Load file counts for each resident
       const residentsWithCounts = await Promise.all(

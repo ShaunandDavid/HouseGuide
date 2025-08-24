@@ -196,14 +196,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Houses endpoints (protected)
-  app.get("/api/houses/:name", requireAuth, async (req, res) => {
+  app.get("/api/houses/:idOrName", requireAuth, async (req, res) => {
     try {
-      const { name } = req.params;
+      const { idOrName } = req.params;
       // Validate URL parameter
-      if (!name || name.length > 80) {
-        return res.status(400).json({ error: "Invalid house name" });
+      if (!idOrName || idOrName.length > 80) {
+        return res.status(400).json({ error: "Invalid house identifier" });
       }
-      const house = await storage.getHouseByName(name);
+      
+      // Try to get house by ID first (UUID format), then by name
+      let house;
+      // Check if it looks like a UUID
+      if (idOrName.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        house = await storage.getHouse(idOrName);
+      }
+      
+      // If not found by ID or not a UUID, try by name
+      if (!house) {
+        house = await storage.getHouseByName(idOrName);
+      }
+      
       if (!house) {
         return res.status(404).json({ error: "House not found" });
       }

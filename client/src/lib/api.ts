@@ -58,8 +58,8 @@ export function setCurrentUser(user: Guide) {
 }
 
 // Houses
-export async function getHouseByName(name: string): Promise<House> {
-  return apiRequest(`/houses/${name}`);
+export async function getHouseByName(idOrName: string): Promise<House> {
+  return apiRequest(`/houses/${idOrName}`);
 }
 
 // Residents

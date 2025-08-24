@@ -38,7 +38,7 @@ export default function Login() {
         description: "Successfully signed in.",
       });
       // Navigate to user's house
-      setLocation(`/house/${user.houseName}`);
+      setLocation(`/house/${user.houseId}`);
     } catch (error) {
       // Authentication failed - handled in UI
       toast({
