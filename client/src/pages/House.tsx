@@ -18,6 +18,7 @@ interface ResidentWithCounts extends Resident {
 
 export default function House() {
   const { houseId } = useParams<{ houseId: string }>();
+  const [, setLocation] = useLocation();
   const [house, setHouse] = useState<House | null>(null);
   const [residents, setResidents] = useState<ResidentWithCounts[]>([]);
   const [filteredResidents, setFilteredResidents] = useState<ResidentWithCounts[]>([]);
@@ -26,8 +27,7 @@ export default function House() {
   const { toast } = useToast();
 
   const { isLoading, error } = useQuery({
-    queryKey: [`house-${houseId}`],
-    queryFn: () => apiRequest("GET", `/api/houses/${houseId}`),
+    queryKey: [`/api/houses`, houseId],
     enabled: !!houseId,
     retry: (failureCount, error) => {
       // Don't retry if house not found
@@ -127,7 +127,7 @@ export default function House() {
               <p className="text-sm text-gray-500">Error: {error?.message || 'Unknown error'}</p>
             </div>
             <div className="mt-4 space-y-2">
-              <Button onClick={() => navigate("/")} className="w-full">Back to Login</Button>
+              <Button onClick={() => setLocation("/")} className="w-full">Back to Login</Button>
               <Button variant="outline" onClick={() => window.location.reload()} className="w-full">
                 Retry
               </Button>
