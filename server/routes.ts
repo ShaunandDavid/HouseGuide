@@ -616,11 +616,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/goals", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertGoalSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const goalData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure goal is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertGoalSchema.parse(goalData);
       
       const goal = await storage.createGoal(validatedData);
       res.status(201).json(goal);
@@ -704,11 +707,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/chores", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertChoreSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const choreData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure chore is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertChoreSchema.parse(choreData);
       
       const chore = await storage.createChore(validatedData);
       res.status(201).json(chore);
@@ -755,11 +761,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accomplishments", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertAccomplishmentSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const accomplishmentData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure accomplishment is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertAccomplishmentSchema.parse(accomplishmentData);
       
       const accomplishment = await storage.createAccomplishment(validatedData);
       res.status(201).json(accomplishment);
@@ -806,11 +815,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/incidents", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertIncidentSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const incidentData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure incident is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertIncidentSchema.parse(incidentData);
       
       const incident = await storage.createIncident(validatedData);
       res.status(201).json(incident);
@@ -857,11 +869,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/meetings", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertMeetingSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const meetingData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure meeting is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertMeetingSchema.parse(meetingData);
       
       const meeting = await storage.createMeeting(validatedData);
       res.status(201).json(meeting);
@@ -908,11 +923,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/fees", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertProgramFeeSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const feeData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure fee is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      const validatedData = insertProgramFeeSchema.parse(feeData);
       
       const fee = await storage.createProgramFee(validatedData);
       res.status(201).json(fee);
@@ -959,12 +977,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notes", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertNoteSchema.parse(req.body);
+      // Add houseId and createdBy before validation
+      const noteData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure note is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
-      
+      const validatedData = insertNoteSchema.parse(noteData);
       const note = await storage.createNote(validatedData);
       res.status(201).json(note);
     } catch (error) {
