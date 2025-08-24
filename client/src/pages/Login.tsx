@@ -37,8 +37,18 @@ export default function Login() {
         title: "Welcome to HouseGuide",
         description: "Successfully signed in.",
       });
-      // Navigate to user's house
-      setLocation(`/house/${user.houseId}`);
+      
+      // Navigate to user's house if they have one, otherwise show error
+      if (user.houseId) {
+        setLocation(`/house/${user.houseId}`);
+      } else {
+        toast({
+          title: "Setup Required",
+          description: "Your facility setup is incomplete. Please contact support.",
+          variant: "destructive"
+        });
+        console.error('LOGIN: User has no houseId:', user);
+      }
     } catch (error) {
       // Authentication failed - handled in UI
       toast({

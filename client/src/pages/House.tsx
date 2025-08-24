@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useParams, navigate } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Home, User, ChevronRight, Settings, UserPlus, Filter } from "lucide-rea
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { House, Resident, FileRecord } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/apiClient";
 
 interface ResidentWithCounts extends Resident {
   commitmentCount: number;
@@ -20,14 +22,25 @@ export default function House() {
   const [residents, setResidents] = useState<ResidentWithCounts[]>([]);
   const [filteredResidents, setFilteredResidents] = useState<ResidentWithCounts[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'graduated'>('all');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict with useQuery's isLoading
   const { toast } = useToast();
+
+  const { isLoading, error } = useQuery({
+    queryKey: [`house-${houseId}`],
+    queryFn: () => apiRequest(`/api/houses/${houseId}`),
+    enabled: !!houseId,
+    retry: (failureCount, error) => {
+      // Don't retry if house not found
+      if (error?.message?.includes('404')) return false;
+      return failureCount < 3;
+    }
+  });
 
   useEffect(() => {
     if (houseId) {
       const controller = new AbortController();
       loadHouseData(controller.signal);
-      
+
       // Cleanup function to abort requests on unmount
       return () => {
         controller.abort();
@@ -46,8 +59,8 @@ export default function House() {
 
   const loadHouseData = async (signal?: AbortSignal) => {
     if (!houseId) return;
-    
-    setIsLoading(true);
+
+    setIsLoadingPage(true);
     try {
       // Load house data - houseId is actually the house ID from the URL
       const houseData = await getHouseByName(houseId);
@@ -55,7 +68,7 @@ export default function House() {
 
       // Load residents
       const residentsData = await getResidentsByHouse(houseId);
-      
+
       // Load file counts for each resident
       const residentsWithCounts = await Promise.all(
         residentsData.map(async (resident) => {
@@ -63,7 +76,7 @@ export default function House() {
             const files = await getFilesByResident(resident.id);
             const commitmentCount = files.filter(f => f.type === 'commitment').length;
             const writeupCount = files.filter(f => f.type === 'writeup').length;
-            
+
             return {
               ...resident,
               commitmentCount,
@@ -79,7 +92,7 @@ export default function House() {
           }
         })
       );
-      
+
       setResidents(residentsWithCounts);
       setFilteredResidents(residentsWithCounts);
     } catch (error) {
@@ -90,11 +103,11 @@ export default function House() {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingPage(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoadingPage) { // Use the renamed isLoadingPage state
     return (
       <div className="min-h-screen flex items-center justify-center" data-testid="house-loading">
         <Loading size="lg" />
@@ -102,18 +115,32 @@ export default function House() {
     );
   }
 
-  if (!house) {
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-full max-w-md mx-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
-            <h1 className="text-xl font-bold text-gray-900 mb-2">House Not Found</h1>
-            <p className="text-gray-600">The requested house could not be found.</p>
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">House Not Found</h1>
+            <p className="text-gray-600 mb-4">The requested house could not be found.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-500">House ID: {houseId}</p>
+              <p className="text-sm text-gray-500">Error: {error?.message || 'Unknown error'}</p>
+            </div>
+            <div className="mt-4 space-y-2">
+              <Button onClick={() => navigate("/")} className="w-full">Back to Login</Button>
+              <Button variant="outline" onClick={() => window.location.reload()} className="w-full">
+                Retry
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  // This part is now conditionally rendered only if there's no error and not loading page.
+  // The previous check for !house is implicitly handled by the error display if the house isn't found.
+  // If house is null but no error, it means it's still loading or some other state, but the primary error handling is above.
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-50" data-testid="house-page">
@@ -126,7 +153,7 @@ export default function House() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900" data-testid="house-name">
-                {house.name} House
+                {house?.name ?? 'Loading House'} House
               </h2>
               <p className="text-sm text-gray-600">Residential Care Facility</p>
             </div>
@@ -224,8 +251,8 @@ export default function House() {
         ) : (
           <div className="space-y-3">
             {filteredResidents.map((resident) => (
-              <Link 
-                key={resident.id} 
+              <Link
+                key={resident.id}
                 href={`/resident/${resident.id}`}
                 data-testid={`resident-card-${resident.id}`}
               >
@@ -246,14 +273,14 @@ export default function House() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge 
+                        <Badge
                           variant="secondary"
                           className="bg-green-100 text-green-800"
                           data-testid="commitment-count"
                         >
                           {resident.commitmentCount} Commitments
                         </Badge>
-                        <Badge 
+                        <Badge
                           variant="secondary"
                           className="bg-amber-100 text-amber-800"
                           data-testid="writeup-count"

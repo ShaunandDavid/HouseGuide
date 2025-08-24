@@ -108,11 +108,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "INVALID_PASSWORD: Invalid credentials" });
       }
 
+      // Validate that user has a house
+      if (!guide.houseId) {
+        console.error(`LOGIN: NO_HOUSE - User has no houseId: ${email}`);
+        return res.status(500).json({ error: "Account setup incomplete. Please contact support." });
+      }
+
+      // Verify the house exists
+      const house = await storage.getHouse(guide.houseId);
+      if (!house) {
+        console.error(`LOGIN: HOUSE_NOT_FOUND - House ${guide.houseId} not found for user: ${email}`);
+        return res.status(500).json({ error: "Facility not found. Please contact support." });
+      }
+
+      console.log(`LOGIN: House verified - ID: ${house.id}, Name: ${house.name}`);
+
       // Create JWT token
       const jwtPayload = {
         userId: guide.id,
         email: guide.email,
-        houseId: guide.houseId || ''
+        houseId: guide.houseId
       };
       
       const token = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
@@ -171,14 +186,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: "User already exists" });
       }
 
-      // Hash password
+      // First create the house
+      const house = await storage.createHouse({
+        name: validatedData.houseName,
+        address: "",
+        phone: "",
+        email: validatedData.email
+      });
+      
+      console.log(`SIGNUP: Created house - ID: ${house.id}, Name: ${house.name}`);
+
+      // Hash password and create guide with house reference
       const hashedPassword = await bcrypt.hash(validatedData.password, 12);
       const guide = await storage.createGuide({
         ...validatedData,
-        password: hashedPassword
+        password: hashedPassword,
+        houseId: house.id
       });
       
-      console.log(`SIGNUP: Created user - ID: ${guide.id}, Email: ${guide.email}, Verified: ${guide.isEmailVerified}`);
+      console.log(`SIGNUP: Created user - ID: ${guide.id}, Email: ${guide.email}, HouseID: ${guide.houseId}, Verified: ${guide.isEmailVerified}`);
 
       // Send verification email
       const baseUrl = process.env.NODE_ENV === 'production' 
