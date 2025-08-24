@@ -235,7 +235,7 @@ export class DbStorage implements IStorage {
   }
 
   async getFilesByResident(residentId: string): Promise<FileRecord[]> {
-    const result = await db.select().from(files).where(eq((files as any).resident_id, residentId));
+    const result = await db.select().from(files).where(eq(files.residentId, residentId));
     return result.map(file => ({
       ...file,
       created: file.created.toISOString(),
