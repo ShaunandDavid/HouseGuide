@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
