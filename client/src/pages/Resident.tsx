@@ -8,6 +8,7 @@ import { FileCard } from "@/components/ui/file-card";
 import { DocumentScanModal } from "@/components/DocumentScanModal";
 import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
 import { StatusManagementModal } from "@/components/StatusManagementModal";
+import { QuickNoteModal } from "@/components/QuickNoteModal";
 import { 
   ArrowLeft, 
   User, 
@@ -32,6 +33,7 @@ export default function ResidentPage() {
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReportEditor, setShowReportEditor] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -203,7 +205,11 @@ export default function ResidentPage() {
               </CardContent>
             </Card>
             
-            <Card className="hover:shadow-md transition-shadow cursor-pointer" data-testid="add-note-action">
+            <Card 
+              className="hover:shadow-md transition-shadow cursor-pointer" 
+              onClick={() => setShowQuickNoteModal(true)}
+              data-testid="add-note-action"
+            >
               <CardContent className="p-4">
                 <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mb-2">
                   <FileText className="w-4 h-4 text-green-600" />
@@ -304,6 +310,13 @@ export default function ResidentPage() {
         onOpenChange={setShowStatusModal}
         resident={resident}
         onUpdate={loadResidentData}
+      />
+
+      {/* Quick Note Modal */}
+      <QuickNoteModal
+        isOpen={showQuickNoteModal}
+        onClose={() => setShowQuickNoteModal(false)}
+        residentId={resident.id}
       />
 
       {/* AI Weekly Report Editor */}
