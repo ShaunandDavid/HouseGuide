@@ -1,0 +1,112 @@
+Do this, step-by-step
+
+Confirm what the DB actually has (no \d in generic runners)
+Run this SQL (works anywhere, not just psql):
+
+-- columns on files
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name='files'
+ORDER BY ordinal_position;
+
+-- FKs (if any)
+SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS foreign_table, ccu.column_name AS foreign_column
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name
+WHERE tc.table_name = 'files' AND tc.constraint_type='FOREIGN KEY';
+
+
+Decide your canonical schema (pick one and stick to it)
+If your new code expects camelCase IDs (e.g., residentId, houseId), use that across DB + ORM. Since the table is empty, avoid renames and just create correct columns.
+
+Prisma example (adjust names/types to your app):
+
+model File {
+  id         String   @id @default(cuid())
+  residentId String?  // FK -> Resident.id
+  houseId    String?  // FK -> House.id
+  name       String
+  mimeType   String?
+  url        String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  Resident   Resident? @relation(fields: [residentId], references: [id])
+  House      House?    @relation(fields: [houseId], references: [id])
+
+  @@index([residentId])
+  @@index([houseId])
+}
+
+
+Push schema cleanly
+Since the table is empty, a force reset is safest to eliminate drift:
+
+# If you’re on Prisma:
+npx prisma generate
+npx prisma migrate status
+npx prisma db push --force-reset
+
+
+If you’re truly on Drizzle, use drizzle-kit push / your migration flow instead. (Your earlier spec said Drizzle; your command indicates Prisma—make them match.)
+
+If you must patch columns without reset
+(Only if you can’t reset)
+
+ALTER TABLE files
+  ADD COLUMN IF NOT EXISTS residentId text,
+  ADD COLUMN IF NOT EXISTS houseId    text;
+
+-- (Optional) add indexes
+CREATE INDEX IF NOT EXISTS idx_files_residentId ON files(residentId);
+CREATE INDEX IF NOT EXISTS idx_files_houseId ON files(houseId);
+
+
+Align the application code
+
+Replace all old references (resident, image, house_id, etc.) with the new field names your ORM expects (residentId, houseId, name, mimeType, url, …).
+
+Check API DTOs, zod/joi schemas, and frontend form fields to ensure they post residentId/houseId.
+
+Smoke test the table
+
+// Prisma example
+await prisma.file.create({
+  data: {
+    name: 'test.pdf',
+    mimeType: 'application/pdf',
+    url: 'https://example.com/test.pdf',
+    residentId: null,
+    houseId: null,
+  }
+});
+
+const rows = await prisma.file.findMany({ take: 3 });
+console.log(rows);
+
+
+(or the equivalent with Drizzle)
+
+Add foreign keys once IDs exist
+Only add FKs after you’re sure Resident.id and House.id exist and match types:
+
+ALTER TABLE files
+  ADD CONSTRAINT files_resident_fk
+  FOREIGN KEY (residentId) REFERENCES resident(id)
+  ON DELETE SET NULL;
+
+ALTER TABLE files
+  ADD CONSTRAINT files_house_fk
+  FOREIGN KEY (houseId) REFERENCES house(id)
+  ON DELETE SET NULL;
+
+Common gotchas (quick)
+
+Mixed naming (house_id in DB, houseId in code) → pick one (recommend camelCase in ORM, push to DB).
+
+Wrong command set (Prisma vs Drizzle) → standardize on one tool.
+
+Stale client → always run prisma generate (or Drizzle’s equivalent) after schema changes.
+
+Empty table but non-null columns → keep residentId/houseId nullable unless you always attach a record.
