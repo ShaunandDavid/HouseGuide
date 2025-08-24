@@ -293,6 +293,7 @@ export default function ResidentPage() {
         isOpen={showScanModal}
         onClose={() => setShowScanModal(false)}
         residentId={resident.id}
+        houseId={resident.house}
         onDocumentSaved={handleDocumentSaved}
       />
 

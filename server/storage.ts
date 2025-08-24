@@ -262,7 +262,7 @@ export class MemStorage implements IStorage {
   }
 
   async getFilesByResident(residentId: string): Promise<FileRecord[]> {
-    return Array.from(this.files.values()).filter(file => file.resident === residentId);
+    return Array.from(this.files.values()).filter(file => file.residentId === residentId);
   }
 
   async createFile(insertFile: InsertFile): Promise<FileRecord> {
@@ -270,7 +270,6 @@ export class MemStorage implements IStorage {
     const file: FileRecord = {
       ...insertFile,
       id,
-      image: `file-${id}.jpg`, // Placeholder
       created: new Date().toISOString(),
       updated: new Date().toISOString()
     };
@@ -324,7 +323,7 @@ export class MemStorage implements IStorage {
   }
 
   async getGoalsByResident(residentId: string): Promise<Goal[]> {
-    return Array.from(this.goals.values()).filter(goal => goal.resident === residentId);
+    return Array.from(this.goals.values()).filter(goal => goal.residentId === residentId);
   }
 
   async createGoal(insertGoal: InsertGoal): Promise<Goal> {
@@ -362,7 +361,7 @@ export class MemStorage implements IStorage {
   }
 
   async getChecklistByResident(residentId: string): Promise<Checklist | undefined> {
-    return Array.from(this.checklists.values()).find(checklist => checklist.resident === residentId);
+    return Array.from(this.checklists.values()).find(checklist => checklist.residentId === residentId);
   }
 
   async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {
@@ -396,7 +395,7 @@ export class MemStorage implements IStorage {
   }
 
   async getChoresByResident(residentId: string): Promise<Chore[]> {
-    return Array.from(this.chores.values()).filter(chore => chore.resident === residentId);
+    return Array.from(this.chores.values()).filter(chore => chore.residentId === residentId);
   }
 
   async createChore(insertChore: InsertChore): Promise<Chore> {
@@ -434,7 +433,7 @@ export class MemStorage implements IStorage {
   }
 
   async getAccomplishmentsByResident(residentId: string): Promise<Accomplishment[]> {
-    return Array.from(this.accomplishments.values()).filter(acc => acc.resident === residentId);
+    return Array.from(this.accomplishments.values()).filter(acc => acc.residentId === residentId);
   }
 
   async createAccomplishment(insertAccomplishment: InsertAccomplishment): Promise<Accomplishment> {
@@ -472,7 +471,7 @@ export class MemStorage implements IStorage {
   }
 
   async getIncidentsByResident(residentId: string): Promise<Incident[]> {
-    return Array.from(this.incidents.values()).filter(incident => incident.resident === residentId);
+    return Array.from(this.incidents.values()).filter(incident => incident.residentId === residentId);
   }
 
   async createIncident(insertIncident: InsertIncident): Promise<Incident> {
@@ -510,7 +509,7 @@ export class MemStorage implements IStorage {
   }
 
   async getMeetingsByResident(residentId: string): Promise<Meeting[]> {
-    return Array.from(this.meetings.values()).filter(meeting => meeting.resident === residentId);
+    return Array.from(this.meetings.values()).filter(meeting => meeting.residentId === residentId);
   }
 
   async createMeeting(insertMeeting: InsertMeeting): Promise<Meeting> {
@@ -548,7 +547,7 @@ export class MemStorage implements IStorage {
   }
 
   async getProgramFeesByResident(residentId: string): Promise<ProgramFee[]> {
-    return Array.from(this.programFees.values()).filter(fee => fee.resident === residentId);
+    return Array.from(this.programFees.values()).filter(fee => fee.residentId === residentId);
   }
 
   async createProgramFee(insertFee: InsertProgramFee): Promise<ProgramFee> {

@@ -17,6 +17,7 @@ import AccomplishmentTracker from "./AccomplishmentTracker";
 import IncidentTracker from "./IncidentTracker";
 import MeetingTracker from "./MeetingTracker";
 import ProgramFeesTracker from "./ProgramFeesTracker";
+import { NotesManagement } from "@/components/NotesManagement";
 
 export default function ResidentDashboard() {
   const { id } = useParams<{ id: string }>();
@@ -156,8 +157,10 @@ export default function ResidentDashboard() {
             
             <Route path="/resident/:id/notes">
               <div className="bg-white p-6 rounded-lg border">
-                <h2 className="text-lg font-semibold mb-4">Notes</h2>
-                <p className="text-gray-600">Manual notes and OCR-extracted text will appear here.</p>
+                <NotesManagement 
+                  residentId={resident.id} 
+                  houseId={resident.house}
+                />
               </div>
             </Route>
             
