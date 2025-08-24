@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendEmail, generateVerificationEmail } from "./email";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { 
   insertGuideSchema, insertHouseSchema, insertResidentSchema, insertFileSchema,
   insertReportSchema, insertGoalSchema, insertChecklistSchema, insertChoreSchema,
@@ -12,28 +13,45 @@ import {
 // Authentication middleware
 async function requireAuth(req: any, res: any, next: any) {
   const token = req.cookies?.authToken;
-  if (!token || !token.startsWith('auth-')) {
+  if (!token) {
+    console.error('AUTH: No token found in cookies');
     return res.status(401).json({ error: 'Authentication required' });
   }
   
-  // Extract guide ID from token
-  const guideParts = token.split('-');
-  if (guideParts.length < 2) {
-    return res.status(401).json({ error: 'Invalid authentication token' });
-  }
-  
-  const guideId = guideParts[1];
   try {
-    const guide = await storage.getGuide(guideId);
-    if (!guide || !guide.isEmailVerified) {
-      return res.status(401).json({ error: 'Authentication required' });
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: string;
+      email: string;
+      houseId: string;
+    };
+    
+    // Load user from database
+    const guide = await storage.getGuide(decoded.userId);
+    if (!guide) {
+      console.error('AUTH: User not found:', decoded.userId);
+      return res.status(401).json({ error: 'NOT_FOUND: User not found' });
+    }
+    
+    if (!guide.isEmailVerified) {
+      console.error('AUTH: Email not verified for user:', decoded.email);
+      return res.status(401).json({ error: 'UNVERIFIED_EMAIL: Please verify your email' });
     }
     
     // Attach guide info to request for house-scoped access
     req.guide = guide;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Authentication required' });
+    if (error instanceof jwt.JsonWebTokenError) {
+      console.error('AUTH: Invalid token -', error.message);
+      return res.status(401).json({ error: 'TOKEN_VERIFY_FAIL: Invalid authentication token' });
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      console.error('AUTH: Token expired');
+      return res.status(401).json({ error: 'TOKEN_EXPIRED: Authentication token expired' });
+    }
+    console.error('AUTH: Unknown error -', error);
+    return res.status(401).json({ error: 'Authentication failed' });
   }
 }
 
@@ -48,49 +66,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
       
+      // Log DB check
+      console.log('LOGIN: Checking database connection...');
+      const dbHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : 'in-memory';
+      console.log('LOGIN: DB Host:', dbHost);
+      
+      // Quick DB check
+      try {
+        const houses = await storage.getAllHouses();
+        console.log(`LOGIN: DB Check - Found ${houses.length || 0} houses in database`);
+      } catch (e) {
+        console.log('LOGIN: DB Check - Using fallback storage');
+      }
+      
       if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required" });
       }
 
       const guide = await storage.getGuideByEmail(email);
       if (!guide) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        console.error(`LOGIN: NOT_FOUND - User not found: ${email}`);
+        return res.status(401).json({ error: "NOT_FOUND: Invalid credentials" });
       }
 
       // Check if email is verified
       if (!guide.isEmailVerified) {
+        console.error(`LOGIN: UNVERIFIED_EMAIL - Email not verified: ${email}`);
         return res.status(403).json({ 
-          error: "Please verify your email address before signing in. Check your email for the verification link.",
+          error: "UNVERIFIED_EMAIL: Please verify your email address before signing in.",
           requiresVerification: true
         });
       }
 
       const isValidPassword = await bcrypt.compare(password, guide.password);
       if (!isValidPassword) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        console.error(`LOGIN: INVALID_PASSWORD - Invalid password for: ${email}`);
+        return res.status(401).json({ error: "INVALID_PASSWORD: Invalid credentials" });
       }
 
+      // Create JWT token
+      const jwtPayload = {
+        userId: guide.id,
+        email: guide.email,
+        houseId: guide.houseId || ''
+      };
+      
+      const token = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
+        expiresIn: '24h'
+      });
+      
       // Remove password from response
       const { password: _, ...userWithoutPassword } = guide;
-      const token = `auth-${guide.id}-${Date.now()}`;
       
       // Set secure httpOnly cookie with deployment-friendly settings
+      const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('authToken', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
       });
+      
+      console.log(`LOGIN: SUCCESS - User logged in: ${email}, Cookie set with secure=${isProduction}, sameSite=${isProduction ? 'none' : 'lax'}`);
       
       res.json({ 
         user: userWithoutPassword,
         success: true
       });
     } catch (error) {
-      // Log without sensitive details in production
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Login error:', error);
-      }
+      console.error('LOGIN: ERROR -', error);
       res.status(500).json({ error: "Authentication failed" });
     }
   });
@@ -98,6 +142,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const validatedData = insertGuideSchema.parse(req.body);
+      
+      // Log DB check
+      console.log('SIGNUP: Checking database connection...');
+      const dbHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : 'in-memory';
+      console.log('SIGNUP: DB Host:', dbHost);
       
       // Check if user already exists
       const existing = await storage.getGuideByEmail(validatedData.email);
@@ -111,6 +160,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         password: hashedPassword
       });
+      
+      console.log(`SIGNUP: Created user - ID: ${guide.id}, Email: ${guide.email}, Verified: ${guide.isEmailVerified}`);
 
       // Send verification email
       const baseUrl = process.env.NODE_ENV === 'production' 
@@ -127,7 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const emailSent = await sendEmail(emailParams);
         if (!emailSent) {
-          console.error('Failed to send verification email');
+          console.error('SIGNUP: Failed to send verification email');
+        } else {
+          console.log('SIGNUP: Verification email sent to', guide.email);
         }
       }
 
@@ -137,10 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requiresVerification: true
       });
     } catch (error) {
-      // Log without sensitive details in production
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Registration error:', error);
-      }
+      console.error('SIGNUP: ERROR -', error);
       res.status(500).json({ error: "Registration failed" });
     }
   });
@@ -158,13 +208,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let guide = await storage.getGuideByVerificationToken(token);
       
       if (!guide) {
-        // If not found by token, check if any guide has this token but is already verified
-        // This handles cases where multiple clicks happen quickly
-        console.log('Token not found, checking for already verified accounts');
+        console.log('VERIFY: Token not found:', token);
         return res.status(404).json({ error: "Invalid or expired verification token" });
       }
 
       if (guide.isEmailVerified) {
+        console.log('VERIFY: Already verified:', guide.email);
         return res.json({ 
           message: "Email already verified! You can now sign in to manage your facility.", 
           success: true 
@@ -176,15 +225,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isEmailVerified: true,
         verificationToken: undefined
       });
+      
+      console.log(`VERIFY: SUCCESS - Email verified for: ${guide.email}`);
 
       res.json({ 
         message: "Email verified successfully! You can now sign in to manage your facility.",
         success: true 
       });
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Email verification error:', error);
-      }
+      console.error('VERIFY: ERROR -', error);
       res.status(500).json({ error: "Verification failed" });
     }
   });

@@ -6,12 +6,15 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-// Note: DATABASE_URL is optional - system will use in-memory storage if not provided
-if (process.env.DATABASE_URL) {
-  console.log('Database URL configured - using PostgreSQL');
-} else {
-  console.log('No DATABASE_URL found - using in-memory storage');
-}
+// Print environment variables on boot (masked)
+console.log('=== ENVIRONMENT CONFIGURATION ===');
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? '✓ Set (PostgreSQL)' : '✗ Not set (using in-memory)');
+console.log('SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? '✓ Set' : '✗ Not set');
+console.log('SENDGRID_FROM_EMAIL:', process.env.SENDGRID_FROM_EMAIL || 'Not set');
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? `✓ Set (${process.env.JWT_SECRET.length} chars)` : '✗ Not set');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL || 'Not set');
+console.log('================================');
 
 const app = express();
 
@@ -20,10 +23,15 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable for Vite dev server
   crossOriginEmbedderPolicy: false
 }));
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : true,
-  credentials: true
-}));
+// CORS configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+};
+app.use(cors(corsOptions));
+console.log('CORS configured with origin:', corsOptions.origin);
 
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
@@ -31,8 +39,7 @@ const authLimiter = rateLimit({
   max: 5, // limit each IP to 5 requests per windowMs
   message: { error: "Too many authentication attempts, please try again later." },
   standardHeaders: true,
-  legacyHeaders: false,
-  trustProxy: true, // Fix for X-Forwarded-For warning
+  legacyHeaders: false
 });
 
 app.use("/api/auth", authLimiter);
@@ -72,6 +79,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Health check on boot
+  try {
+    const { storage } = await import('./storage');
+    const houses = await storage.getAllHouses();
+    console.log(`HEALTH CHECK: Database connection successful - ${houses.length} houses found`);
+  } catch (error) {
+    console.error('HEALTH CHECK: Database connection failed:', error);
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
