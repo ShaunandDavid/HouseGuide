@@ -654,9 +654,36 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
               Created: {formatTimestamp(entryDetail.entry.timestamp)}
             </div>
             
-            <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-48">
-              {JSON.stringify(entryDetail.entry.data, null, 2)}
-            </pre>
+            <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+              {entryDetail.entry.data.text && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Note Content:</h4>
+                  <p className="text-gray-700 whitespace-pre-wrap break-words">
+                    {entryDetail.entry.data.text}
+                  </p>
+                </div>
+              )}
+              
+              {entryDetail.entry.data.source && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1">Source:</h4>
+                  <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                    entryDetail.entry.data.source === 'manual' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {entryDetail.entry.data.source === 'manual' ? 'Manual Entry' : 'OCR Extracted'}
+                  </span>
+                </div>
+              )}
+              
+              {entryDetail.entry.data.createdBy && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1">Created by:</h4>
+                  <p className="text-gray-600 text-sm">{entryDetail.entry.data.createdBy}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
