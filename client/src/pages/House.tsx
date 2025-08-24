@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import { getCurrentUser } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +18,9 @@ interface ResidentWithCounts extends Resident {
 }
 
 export default function House() {
-  const { houseId } = useParams<{ houseId: string }>();
   const [, setLocation] = useLocation();
+  const currentUser = getCurrentUser();
+  const houseId = currentUser?.houseId;
   const [house, setHouse] = useState<House | null>(null);
   const [residents, setResidents] = useState<ResidentWithCounts[]>([]);
   const [filteredResidents, setFilteredResidents] = useState<ResidentWithCounts[]>([]);
@@ -181,7 +183,7 @@ export default function House() {
                       <Settings className="w-4 h-4 mr-2" />
                       Rename Facility
                     </Button>
-                    <Link href={`/house/${houseId}/onboard`}>
+                    <Link href={`/dashboard/onboard`}>
                       <Button size="sm">
                         <UserPlus className="w-4 h-4 mr-2" />
                         Add First Resident
@@ -202,7 +204,7 @@ export default function House() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Residents</h3>
             <p className="text-gray-600">Manage resident files and weekly reports</p>
           </div>
-          <Link href={`/house/${houseId}/onboard`}>
+          <Link href={`/dashboard/onboard`}>
             <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-resident">
               <UserPlus className="w-4 h-4 mr-2" />
               Add New Resident

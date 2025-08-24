@@ -36,8 +36,8 @@ function Router() {
       <Route path="/" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/verify-email" component={VerifyEmail} />
-      <Route path="/house/:houseId" component={House} />
-      <Route path="/house/:houseId/onboard" component={OnboardResident} />
+      <Route path="/dashboard" component={House} />
+      <Route path="/dashboard/onboard" component={OnboardResident} />
       <Route path="/resident/:id" component={Resident} />
       <Route path="/resident/:id/trackers" component={TrackerDashboard} />
       <Route path="/resident/:id/goals" component={GoalTracker} />

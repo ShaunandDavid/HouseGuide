@@ -40,7 +40,7 @@ export default function Login() {
       
       // Navigate to user's dashboard
       if (user.houseId) {
-        setLocation(`/house/${user.houseId}`);
+        setLocation(`/dashboard`);
       } else {
         toast({
           title: "Setup Required",

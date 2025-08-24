@@ -77,7 +77,7 @@ export default function ResidentPage() {
   };
 
   const handleGoBack = () => {
-    setLocation('/house/MAIN');
+    setLocation('/dashboard');
   };
 
   const handleViewFile = (file: FileRecord) => {

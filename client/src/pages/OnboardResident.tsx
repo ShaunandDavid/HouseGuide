@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useLocation, useParams } from "wouter";
+import { useLocation } from "wouter";
+import { getCurrentUser } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +12,9 @@ import { ArrowLeft, UserPlus, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function OnboardResident() {
-  const { houseId } = useParams<{ houseId: string }>();
   const [, setLocation] = useLocation();
+  const currentUser = getCurrentUser();
+  const houseId = currentUser?.houseId;
   const [formData, setFormData] = useState({
     firstName: "",
     lastInitial: "",
@@ -48,6 +50,7 @@ export default function OnboardResident() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Fix: Send auth cookies
         body: JSON.stringify({
           ...formData,
           house: houseId
@@ -116,7 +119,7 @@ export default function OnboardResident() {
               
               <div className="space-y-4">
                 <Button 
-                  onClick={() => setLocation(`/house/${houseId}`)} 
+                  onClick={() => setLocation(`/dashboard`)} 
                   className="w-full"
                   data-testid="button-view-residents"
                 >
@@ -145,7 +148,7 @@ export default function OnboardResident() {
         <div className="flex items-center gap-4 mb-8">
           <Button 
             variant="ghost" 
-            onClick={() => setLocation(`/house/${houseId}`)}
+            onClick={() => setLocation(`/dashboard`)}
             className="p-2"
             data-testid="button-back"
           >
@@ -267,7 +270,7 @@ export default function OnboardResident() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setLocation(`/house/${houseId}`)}
+                  onClick={() => setLocation(`/dashboard`)}
                   disabled={isLoading}
                   data-testid="button-cancel"
                 >
