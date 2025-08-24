@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, navigate } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/a
 import { useToast } from "@/hooks/use-toast";
 import type { House, Resident, FileRecord } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/apiClient";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ResidentWithCounts extends Resident {
   commitmentCount: number;
@@ -27,7 +27,7 @@ export default function House() {
 
   const { isLoading, error } = useQuery({
     queryKey: [`house-${houseId}`],
-    queryFn: () => apiRequest(`/api/houses/${houseId}`),
+    queryFn: () => apiRequest("GET", `/api/houses/${houseId}`),
     enabled: !!houseId,
     retry: (failureCount, error) => {
       // Don't retry if house not found
