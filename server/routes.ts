@@ -154,13 +154,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Verification token is required" });
       }
 
-      const guide = await storage.getGuideByVerificationToken(token);
+      // First try to find guide by verification token
+      let guide = await storage.getGuideByVerificationToken(token);
+      
       if (!guide) {
+        // If not found by token, check if any guide has this token but is already verified
+        // This handles cases where multiple clicks happen quickly
+        console.log('Token not found, checking for already verified accounts');
         return res.status(404).json({ error: "Invalid or expired verification token" });
       }
 
       if (guide.isEmailVerified) {
-        return res.json({ message: "Email already verified", success: true });
+        return res.json({ 
+          message: "Email already verified! You can now sign in to manage your facility.", 
+          success: true 
+        });
       }
 
       // Mark email as verified

@@ -32,6 +32,7 @@ const authLimiter = rateLimit({
   message: { error: "Too many authentication attempts, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true, // Fix for X-Forwarded-For warning
 });
 
 app.use("/api/auth", authLimiter);
