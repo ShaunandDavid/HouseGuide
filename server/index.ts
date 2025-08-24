@@ -6,6 +6,8 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { PerformanceMonitor, ErrorTracker, HealthCheck } from "./monitoring";
+import { securityMiddleware } from "./security";
 
 // Print environment variables on boot (masked)
 console.log('=== ENVIRONMENT CONFIGURATION ===');
@@ -25,6 +27,11 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable for Vite dev server
   crossOriginEmbedderPolicy: false
 }));
+
+// Enhanced security headers for production
+if (process.env.NODE_ENV === 'production') {
+  app.use(securityMiddleware.addSecurityHeaders);
+}
 // CORS configuration - EXACT origin match required for cookies
 const corsOptions = {
   origin: process.env.FRONTEND_URL, // EXACT, no trailing slash
@@ -46,6 +53,21 @@ const authLimiter = rateLimit({
 });
 
 app.use("/api/auth", authLimiter);
+
+// Add general rate limiting for all API endpoints in production
+if (process.env.NODE_ENV === 'production') {
+  const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: { error: "Too many requests, please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  app.use("/api", apiLimiter);
+}
+
+// Performance monitoring
+app.use(PerformanceMonitor.middleware());
 
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
@@ -92,11 +114,32 @@ app.use((req, res, next) => {
   }
   
   const server = await registerRoutes(app);
+  
+  // Health check endpoint
+  app.get('/api/health/detailed', HealthCheck.middleware());
+  
+  // Metrics endpoint (protected in production)
+  app.get('/api/metrics', (req, res) => {
+    if (process.env.NODE_ENV === 'production' && req.headers['x-metrics-key'] !== process.env.METRICS_KEY) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    res.json(PerformanceMonitor.getMetrics());
+  });
 
+  // Enhanced error handling with tracking
+  app.use(ErrorTracker.middleware());
+  
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    // Track error for monitoring
+    ErrorTracker.trackError(err, {
+      url: _req.url,
+      method: _req.method,
+      ip: _req.ip
+    });
+    
     // Log error for debugging but don't crash server
     console.error('Server error:', err);
     res.status(status).json({ message });
