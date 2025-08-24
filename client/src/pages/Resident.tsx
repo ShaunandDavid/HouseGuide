@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { FileCard } from "@/components/ui/file-card";
 import { DocumentScanModal } from "@/components/DocumentScanModal";
-import { WeeklyReportModal } from "@/components/WeeklyReportModal";
 import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
 import { StatusManagementModal } from "@/components/StatusManagementModal";
 import { 
@@ -31,7 +30,6 @@ export default function ResidentPage() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'commitment' | 'writeup'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showScanModal, setShowScanModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
   const [showReportEditor, setShowReportEditor] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const { toast } = useToast();
@@ -178,18 +176,12 @@ export default function ResidentPage() {
               Open Dashboard
             </Button>
             <Button 
-              onClick={() => setShowReportModal(true)}
-              data-testid="generate-report-button"
-            >
-              Generate Report
-            </Button>
-            <Button 
               onClick={() => setShowReportEditor(true)}
               className="bg-purple-600 hover:bg-purple-700 text-white"
-              data-testid="ai-report-button"
+              data-testid="generate-report-button"
             >
               <Wand2 className="h-4 w-4 mr-2" />
-              AI Report
+              Generate Report
             </Button>
           </div>
         </div>
@@ -308,12 +300,6 @@ export default function ResidentPage() {
         onDocumentSaved={handleDocumentSaved}
       />
 
-      {/* Weekly Report Modal */}
-      <WeeklyReportModal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        resident={resident}
-      />
 
       {/* Status Management Modal */}
       <StatusManagementModal

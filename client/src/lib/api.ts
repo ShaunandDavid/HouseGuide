@@ -1,3 +1,11 @@
+import type {
+  Guide, House, Resident, FileRecord, Report, Goal, Checklist, Chore, 
+  Accomplishment, Incident, Meeting, ProgramFee, Note, WeeklyReport,
+  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertReport,
+  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment,
+  InsertIncident, InsertMeeting, InsertProgramFee, InsertNote, InsertWeeklyReport
+} from "@shared/schema";
+
 // Configuration
 const API_BASE = "/api";
 
@@ -95,6 +103,30 @@ export async function createFile(data: InsertFile): Promise<FileRecord> {
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+// Multipart file upload (preferred method)
+export async function uploadFile(file: File, residentId: string, houseId: string, type?: string, ocrText?: string): Promise<{ file: FileRecord; uploadedFile: any }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('residentId', residentId);
+  formData.append('houseId', houseId);
+  if (type) formData.append('type', type);
+  if (ocrText) formData.append('ocrText', ocrText);
+
+  // Use fetch directly for FormData to avoid setting Content-Type header
+  const response = await fetch('/api/files/upload', {
+    method: 'POST',
+    credentials: 'include', // Include cookies for authentication
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Failed to upload file' }));
+    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 export async function getFilesByResident(residentId: string): Promise<FileRecord[]> {

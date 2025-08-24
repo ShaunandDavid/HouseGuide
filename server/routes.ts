@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sendEmail, generateVerificationEmail } from "./email";
@@ -12,6 +13,9 @@ import {
 } from "@shared/schema";
 import { readFileSync } from "fs";
 import { join } from "path";
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 
 // Authentication middleware
 async function requireAuth(req: any, res: any, next: any) {
@@ -409,6 +413,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Files endpoints
+  
+  // Create uploads directory if it doesn't exist
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  
+  // Configure multer for file uploads
+  const storage_multer = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      // Create unique filename with timestamp and random string
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2);
+      const extension = path.extname(file.originalname);
+      const filename = `${timestamp}-${randomString}${extension}`;
+      cb(null, filename);
+    }
+  });
+  
+  const upload = multer({
+    storage: storage_multer,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      // Allow images and documents
+      const allowedMimes = [
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/pdf',
+        'text/plain'
+      ];
+      
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only images and PDFs are allowed.'));
+      }
+    }
+  });
+  
+  // Multipart file upload endpoint
+  app.post("/api/files/upload", requireAuth, upload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      const { residentId, houseId, type, ocrText } = req.body;
+      
+      if (!residentId || !houseId) {
+        // Clean up uploaded file if validation fails
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: "residentId and houseId are required" });
+      }
+      
+      // Create file URL (relative path for serving)
+      const fileUrl = `/uploads/${req.file.filename}`;
+      
+      // Create file record
+      const fileRecord = await storage.createFile({
+        residentId,
+        houseId,
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        url: fileUrl,
+        size: req.file.size,
+        type: type || 'general',
+        ocrText: ocrText || null,
+        createdBy: req.guide.id
+      });
+      
+      res.status(201).json({
+        file: fileRecord,
+        uploadedFile: {
+          filename: req.file.filename,
+          originalname: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype,
+          path: fileUrl
+        }
+      });
+      
+    } catch (error) {
+      // Clean up uploaded file if there's an error
+      if (req.file) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Failed to cleanup uploaded file:', unlinkError);
+        }
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.error('File upload error:', error);
+      }
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+  
+  // Serve uploaded files
+  app.use('/uploads', express.static(uploadsDir));
+  
+  // Legacy file creation endpoint (for base64 - keeping for compatibility)
   app.post("/api/files", requireAuth, async (req: any, res) => {
     try {
       const validatedData = insertFileSchema.parse(req.body);

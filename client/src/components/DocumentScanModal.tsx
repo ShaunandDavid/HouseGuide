@@ -6,7 +6,7 @@ import { Loading } from "@/components/ui/loading";
 import { Camera, Upload, X } from "lucide-react";
 import { processImageWithOCR } from "@/lib/tesseract";
 import { classifyDocumentByKeywords } from "@/lib/classify";
-import { createFile, createNote } from "@/lib/api";
+import { uploadFile, createNote } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/api";
 
@@ -92,21 +92,16 @@ export function DocumentScanModal({
         throw new Error('User not authenticated');
       }
 
-      // Create placeholder URL for file (in a real implementation, this would be uploaded to object storage)
-      const fileUrl = `data:${selectedFile.type};base64,${await fileToBase64(selectedFile)}`;
-      
-      // Create file record
-      const fileRecord = await createFile({
+      // Upload file using multipart form data (more efficient than base64)
+      const uploadResult = await uploadFile(
+        selectedFile,
         residentId,
         houseId,
-        filename: selectedFile.name || `scanned-document-${Date.now()}.${getFileExtension(selectedFile.type)}`,
-        mimeType: selectedFile.type,
-        url: fileUrl,
-        size: selectedFile.size,
-        type: finalType === 'commitment' ? 'commitment' : finalType === 'writeup' ? 'writeup' : 'photo',
-        ocrText: ocrResult,
-        createdBy: currentUser.id
-      });
+        finalType === 'commitment' ? 'commitment' : finalType === 'writeup' ? 'writeup' : 'photo',
+        ocrResult
+      );
+      
+      const fileRecord = uploadResult.file;
       
       // Create linked note with OCR text if there is text
       if (ocrResult && ocrResult.trim()) {
@@ -135,32 +130,6 @@ export function DocumentScanModal({
         variant: "destructive"
       });
     }
-  };
-  
-  // Helper function to convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        const base64Data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-        resolve(base64Data);
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
-  
-  // Helper function to get file extension from mime type
-  const getFileExtension = (mimeType: string): string => {
-    const mimeToExt: { [key: string]: string } = {
-      'image/jpeg': 'jpg',
-      'image/jpg': 'jpg',
-      'image/png': 'png',
-      'image/gif': 'gif',
-      'image/webp': 'webp'
-    };
-    return mimeToExt[mimeType] || 'jpg';
   };
 
   const handleClose = () => {
