@@ -65,13 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log('Login attempt for:', email);
-      console.log('Password provided:', password?.length > 0 ? `${password.length} chars` : 'empty');
-      console.log('Stored hash exists:', guide.password?.startsWith('$2b$') ? 'yes' : 'no');
-      
       const isValidPassword = await bcrypt.compare(password, guide.password);
-      console.log('Password comparison result:', isValidPassword);
-      
       if (!isValidPassword) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
