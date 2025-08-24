@@ -79,7 +79,7 @@ export default function VerifyEmail() {
             <div className="mt-6 space-y-3">
               {status === 'success' && (
                 <Button 
-                  onClick={() => setLocation("/login")} 
+                  onClick={() => setLocation("/")} 
                   className="w-full"
                   data-testid="button-goto-login"
                 >
@@ -99,7 +99,7 @@ export default function VerifyEmail() {
                   
                   <Button 
                     variant="outline" 
-                    onClick={() => setLocation("/login")} 
+                    onClick={() => setLocation("/")} 
                     className="w-full"
                     data-testid="button-goto-login"
                   >
