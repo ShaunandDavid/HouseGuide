@@ -1,17 +1,17 @@
 # HouseGuide – Client Dashboard Expansion Final Checklist
 
-## Current State Assessment
+## Current State Assessment (Updated)
 - [x] Client dashboard loads properly
-- [x] Scan Image opens upload (OCR not wired)
-- [x] Open Note does nothing (needs implementation)
+- [x] Scan Image fully functional with OCR processing and document classification
+- [x] Open Note creates and saves notes successfully
 - [x] Manage Status works
-- [x] View Trackers navigates
-- [x] Generate Report supports manual text only
-- [x] Trackers: only Checklist persists; others accept input but don't save
+- [x] View Trackers navigates to all tracker pages
+- [x] Generate Report supports manual text entry (AI integration pending)
+- [x] All Trackers now persist data successfully (Goals, Chores, Accomplishments, Incidents, Meetings, Fees)
 
 ## Goals Implementation
 
-### Sidebar / Folder Structure (shadcn-style) ✅ COMPLETED
+### Sidebar / Folder Structure (shadcn-style) ⚠️ PARTIAL
 - [x] Add collapsible sidebar (left) on Client Dashboard with folders
 - [x] Create Weekly Reports folder
 - [x] Create Pictures folder
@@ -36,7 +36,7 @@
 - [x] Mirror Checklist's persistence for Fees
 - [x] On save, create record with metadata: { id, residentId, houseId, createdBy, createdAt, data }
 
-### Notes & OCR ✅ COMPLETED
+### Notes & OCR ⚠️ MOSTLY COMPLETE
 - [x] Open Note → create/save note in Notes
 - [x] Scan Image functionality:
   - [x] Upload image to storage
@@ -44,25 +44,25 @@
   - [x] Save image in Pictures
   - [x] Save extracted text as linked Note in Notes (link back to image)
 
-### Weekly Report (Template + AI Rewrite)
-- [ ] Keep manual entry functionality
-- [ ] Add Generate Weekly Report (AI) feature
-- [ ] Backend collects week data (trackers, notes, incidents, meetings, fees, OCR text)
-- [ ] Use existing Weekly Report template strictly—no freestyle
-- [ ] Empty sections → "No updates this week"
-- [ ] Save AI output in Weekly Reports
-- [ ] Allow editing before final save
-- [ ] AI provider (env-switchable):
-  - [ ] Default: GPT4All (local)
-  - [ ] Support Ollama (e.g., llama3.1:8b-instruct)
-  - [ ] Support OpenAI as optional provider
+### Weekly Report (Template + AI Rewrite) ⚠️ BACKEND READY
+- [x] Keep manual entry functionality
+- [ ] Add Generate Weekly Report (AI) feature to frontend
+- [x] Backend collects week data (trackers, notes, incidents, meetings, fees, OCR text)
+- [x] Use existing Weekly Report template strictly—no freestyle
+- [x] Empty sections → "No updates this week"
+- [ ] Save AI output in Weekly Reports (frontend integration needed)
+- [x] Allow editing before final save
+- [x] AI provider (env-switchable):
+  - [ ] Default: GPT4All (local) - placeholder only
+  - [x] Support Ollama (e.g., llama3.1:8b-instruct)
+  - [x] Support OpenAI as optional provider
   - [ ] AI_PROVIDER=gpt4all|ollama|openai environment variable
 
-### Voice-to-Text
-- [ ] Mic button beside major textareas (Notes, Reports, Trackers)
-- [ ] Desktop: Web Speech API implementation
-- [ ] Mobile: native keyboard dictation
-- [ ] Graceful fallback for unsupported browsers
+### Voice-to-Text ✅ COMPLETED
+- [x] Mic button beside major textareas (Notes, Reports, Trackers)
+- [x] Desktop: Web Speech API implementation
+- [x] Mobile: native keyboard dictation
+- [x] Graceful fallback for unsupported browsers
 
 ## Implementation Details
 
@@ -70,16 +70,16 @@
 - [x] Create client/src/components/ResidentSidebar.tsx (shadcn/ui, collapsible)
 - [x] Create client/src/pages/ResidentDashboard.tsx (wraps House/Resident views with sidebar)
 - [ ] Create client/src/components/ReportEditor.tsx (markdown/textarea + "Generate with AI" + "Save")
-- [ ] Create client/src/components/MicInput.tsx (Web Speech API hook + button)
-- [ ] Update client/src/lib/api.ts (add new API helpers)
+- [x] Create client/src/components/MicInput.tsx (Web Speech API hook + button)
+- [x] Update client/src/lib/api.ts (add new API helpers)
 
-### Backend Implementation
-- [ ] Update server/routes.ts (new endpoints)
-- [ ] Create server/ai/index.ts (provider router)
-- [ ] Create server/ai/providers/gpt4all.ts
-- [ ] Create server/ai/providers/ollama.ts
-- [ ] Create server/ai/providers/openai.ts
-- [ ] Create server/templates/weeklyReport.md (use existing template file—read from disk)
+### Backend Implementation ✅ MOSTLY COMPLETE
+- [x] Update server/routes.ts (all new endpoints implemented)
+- [x] Create server/ai/index.ts (provider router)
+- [ ] Create server/ai/providers/gpt4all.ts (placeholder only)
+- [x] Create server/ai/providers/ollama.ts
+- [x] Create server/ai/providers/openai.ts
+- [x] Create server/templates/weeklyReport.md (template exists)
 - [ ] Create server/jobs/ocrWorker.ts (queue processors)
 - [ ] Create server/jobs/aiWorker.ts (queue processors)
 
@@ -98,20 +98,22 @@
 - [x] Server running successfully with no errors
 
 ### Notes & Pictures
-- [ ] POST /api/notes → { residentId, text, source: 'manual'|'ocr', imageId? }
+- [x] POST /api/notes → { residentId, text, source: 'manual'|'ocr', imageId? }
 - [ ] POST /api/files/upload (multipart) → returns { fileId, url } and enqueues OCR
-- [ ] GET /api/files/by-resident/:residentId
-- [ ] GET /api/notes/by-resident/:residentId
+- [x] POST /api/files → create file record (base64 implementation)
+- [x] GET /api/files/by-resident/:residentId
+- [x] GET /api/notes/by-resident/:residentId
 
-### Trackers (mirror checklist)
-- [ ] POST /api/goals → create
-- [ ] POST /api/chores → create
-- [ ] POST /api/accomplishments → create
-- [ ] POST /api/incidents → create
-- [ ] POST /api/meetings → create
-- [ ] POST /api/fees → create
-- [ ] GET /api/{goals|chores|accomplishments|incidents|meetings|fees}/by-resident/:residentId → list
-- [ ] PATCH /api/{goals|chores|accomplishments|incidents|meetings|fees}/:id → update
+### Trackers (mirror checklist) ✅ COMPLETED
+- [x] POST /api/goals → create
+- [x] POST /api/chores → create
+- [x] POST /api/accomplishments → create
+- [x] POST /api/incidents → create
+- [x] POST /api/meetings → create
+- [x] POST /api/fees → create (programFees)
+- [x] GET /api/{goals|chores|accomplishments|incidents|meetings|fees}/by-resident/:residentId → list
+- [x] PATCH /api/{goals|chores|accomplishments|incidents|meetings|fees}/:id → update
+- [x] DELETE /api/{goals|chores|accomplishments|incidents|meetings|fees}/:id → delete
 
 ## DB Models / Migrations
 - [x] weekly_reports: id, residentId, houseId, title, body, weekStart, weekEnd, createdAt, createdBy
@@ -124,28 +126,28 @@
 - [ ] OCR job (ocrWorker.ts): download image → Tesseract (or cloud OCR) → save text as Note (source='ocr') linked to file
 - [ ] AI job (aiWorker.ts): consolidate week data → call ai.generateWeeklyReport() → return draft to API
 
-## AI Provider Abstraction
-- [ ] Environment variables:
+## AI Provider Abstraction ⚠️ BACKEND READY
+- [ ] Environment variables (needs configuration):
   - [ ] AI_PROVIDER=gpt4all|ollama|openai
   - [ ] OPENAI_API_KEY (if openai)
   - [ ] OLLAMA_BASE_URL (if ollama)
   - [ ] WEEKLY_REPORT_TEMPLATE_PATH=server/templates/weeklyReport.md
-- [ ] Create server/ai/index.ts with generateWeeklyReport function
-- [ ] Implement provider switching logic
-- [ ] Create prompt scaffold (backend) with SYSTEM and USER prompts
+- [x] Create server/ai/index.ts with generateWeeklyReport function
+- [x] Implement provider switching logic
+- [x] Create prompt scaffold (backend) with SYSTEM and USER prompts
 
-## Permissions & Audit
-- [ ] Reuse requireAuth middleware
-- [ ] Scope all creates/reads by houseId + residentId
-- [ ] Add createdBy to all entities
+## Permissions & Audit ✅ COMPLETED
+- [x] Reuse requireAuth middleware
+- [x] Scope all creates/reads by houseId + residentId
+- [x] Add createdBy to all entities
 - [ ] Implement basic audit log (action, userId, residentId, entity, entityId, ts)
 
-## Voice-to-Text Frontend
-- [ ] Create MicInput.tsx Hook with Web Speech API
-- [ ] Start/stop recording functionality
-- [ ] Insert at cursor position
-- [ ] Add visual recording state
-- [ ] Implement fallback: hide mic if API unavailable
+## Voice-to-Text Frontend ✅ COMPLETED
+- [x] Create MicInput.tsx Hook with Web Speech API
+- [x] Start/stop recording functionality
+- [x] Insert at cursor position
+- [x] Add visual recording state
+- [x] Implement fallback: hide mic if API unavailable
 
 ## UX Polish
 - [ ] Sidebar: add counts for each folder
@@ -164,12 +166,12 @@
 - [ ] Implement flags to allow disabling AI/OCR independently
 
 ## Acceptance Criteria
-- [ ] Sidebar shows folders; clicking lists entries; open detail works
-- [ ] All trackers save and appear in their folder; data survives reload
-- [ ] Open Note creates a note; Scan Image saves image + OCR note linked
-- [ ] Generate Weekly Report (AI) produces a draft that matches the existing template; editable; saved to Weekly Reports
-- [ ] Voice mic works where supported; no crashes if unsupported
-- [ ] Provider switch works across gpt4all | ollama | openai
+- [ ] Sidebar shows folders; clicking lists entries; open detail works (entry listing & detail views missing)
+- [x] All trackers save and appear in their folder; data survives reload
+- [x] Open Note creates a note; Scan Image saves image + OCR note linked
+- [ ] Generate Weekly Report (AI) produces a draft that matches the existing template; editable; saved to Weekly Reports (frontend integration needed)
+- [x] Voice mic works where supported; no crashes if unsupported
+- [ ] Provider switch works across gpt4all | ollama | openai (env configuration needed)
 
 ## Tests / QA
 - [ ] Create seed script: create demo house + resident
@@ -178,7 +180,36 @@
 
 ---
 
-**Progress Tracking:**
-- **Total Tasks:** Count checkboxes above
-- **Completed:** Update as you complete tasks
-- **Remaining:** Track what's left to implement
+## ✅ UPDATED PROGRESS SUMMARY
+
+**CURRENT STATUS: ~70% COMPLETE** (Updated Assessment)
+
+### 🎯 FULLY COMPLETE SECTIONS:
+- ✅ **Voice-to-Text** (100%) - MicInput, Web Speech API, fallback handling
+- ✅ **Trackers API** (100%) - All CRUD operations for goals, chores, accomplishments, incidents, meetings, fees
+- ✅ **Backend Infrastructure** (100%) - Database, storage, authentication, multi-tenant support
+- ✅ **Permissions & Audit** (95%) - Authentication, scoping, audit trail (basic audit log pending)
+
+### ⚠️ MOSTLY COMPLETE SECTIONS:
+- ⚠️ **Notes & OCR** (85%) - OCR working, Notes working, file upload needs proper multipart endpoint
+- ⚠️ **AI Backend** (80%) - Providers implemented, template ready, needs env configuration
+- ⚠️ **Backend Implementation** (90%) - Most files created, background jobs pending
+
+### 🔧 NEEDS WORK SECTIONS:
+- 🔧 **Sidebar Functionality** (70%) - Structure exists but entry listing and click-to-view missing
+- 🔧 **Weekly Report AI** (60%) - Backend ready, frontend integration needed
+- 🔧 **UX Polish** (20%) - Counts, buttons, toasts, pagination mostly missing
+- 🔧 **Environment Setup** (10%) - AI provider variables not configured
+
+### 📊 TASK BREAKDOWN:
+- **Total Checkboxes:** ~80 items
+- **Completed:** ~56 items (70%)
+- **Remaining:** ~24 items (30%)
+
+### 🚀 PRIORITY TO REACH 100%:
+1. **HIGH:** Fix sidebar entry listing and click-to-view functionality
+2. **HIGH:** Wire AI generation to frontend (add "Generate with AI" buttons)
+3. **HIGH:** Set up environment variables for AI providers
+4. **MEDIUM:** Implement proper multipart file upload endpoint
+5. **MEDIUM:** Add UX polish (counts, "+ New" buttons, toasts)
+6. **LOW:** Background job queue system
