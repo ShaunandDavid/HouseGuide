@@ -574,10 +574,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "photoUrl is required" });
     }
 
+    const userId = req.guide?.id;
+    
     try {
       const objectStorageService = new ObjectStorageService();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
         req.body.photoUrl,
+        {
+          owner: userId,
+          visibility: "public", // Meeting photos are publicly viewable
+        },
       );
 
       res.status(200).json({
