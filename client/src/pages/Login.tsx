@@ -1,4 +1,4 @@
-import React, { useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,21 +62,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-surface-50" data-testid="login-page">
+    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-surface-50" data-testid="login-page">
       <div className="w-full max-w-sm">
-        {/* App Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center">
-            <Home className="text-white text-2xl" />
+        {/* App Header - Mobile First */}
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-primary rounded-2xl mx-auto mb-3 sm:mb-4 flex items-center justify-center">
+            <Home className="text-white text-xl sm:text-2xl" />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">HouseGuide</h1>
-          <p className="text-gray-600">Residential Care Management</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">HouseGuide</h1>
+          <p className="text-sm sm:text-base text-gray-600">Residential Care Management</p>
         </div>
 
-        {/* Login Form */}
-        <Card>
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Login Form - Mobile First */}
+        <Card className="border-0 sm:border shadow-lg sm:shadow-md">
+          <CardContent className="pt-5 sm:pt-6 px-4 sm:px-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-4">
               <div>
                 <Label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
@@ -88,6 +88,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   disabled={isLoading}
+                  className="h-11 sm:h-10 text-base sm:text-sm touch-manipulation"
                   data-testid="input-email"
                 />
               </div>
@@ -103,13 +104,14 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   disabled={isLoading}
+                  className="h-11 sm:h-10 text-base sm:text-sm touch-manipulation"
                   data-testid="input-password"
                 />
               </div>
               
               <Button 
                 type="submit" 
-                className="w-full"
+                className="w-full h-11 sm:h-10 text-base sm:text-sm font-medium touch-manipulation"
                 disabled={isLoading}
                 data-testid="button-signin"
               >
@@ -124,14 +126,15 @@ export default function Login() {
               </Button>
             </form>
             
-            <div className="mt-6 text-center">
+            <div className="mt-5 sm:mt-6 text-center">
               <Button 
                 variant="ghost" 
                 onClick={() => setLocation("/register")}
-                className="text-sm text-gray-600 hover:text-gray-800"
+                className="text-sm text-gray-600 hover:text-gray-800 h-10 touch-manipulation"
                 data-testid="button-goto-register"
               >
-                Need to set up your facility? Register Here
+                <span className="hidden sm:inline">Need to set up your facility? Register Here</span>
+                <span className="sm:hidden">Register Your Facility</span>
               </Button>
             </div>
           </CardContent>

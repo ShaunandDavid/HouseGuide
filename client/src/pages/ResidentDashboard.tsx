@@ -78,55 +78,91 @@ export default function ResidentDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50" data-testid="resident-dashboard">
-      {/* Sidebar */}
-      <ResidentSidebar 
-        isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+    <div className="min-h-screen flex bg-gray-50 relative" data-testid="resident-dashboard">
+      {/* Mobile overlay for sidebar */}
+      {!sidebarCollapsed && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+      
+      {/* Sidebar - Mobile First */}
+      <div className={`
+        fixed lg:static inset-y-0 left-0 z-40 lg:z-auto
+        transform transition-transform duration-300 ease-in-out lg:transform-none
+        ${sidebarCollapsed ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'}
+      `}>
+        <ResidentSidebar 
+          isCollapsed={false}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleGoBack}
-                data-testid="back-button"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                <User className="text-primary w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-xl font-semibold text-gray-900" data-testid="resident-name">
-                    {resident.firstName} {resident.lastInitial}.
-                  </h1>
-                  <Badge 
-                    variant={resident.status === 'active' ? 'default' : resident.status === 'graduated' ? 'secondary' : 'outline'}
-                    data-testid="resident-status"
-                  >
-                    {resident.status || 'active'}
-                  </Badge>
+      {/* Main Content - Mobile First */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header - Mobile First */}
+        <header className="bg-white shadow-sm border-b sticky top-0 z-20">
+          <div className="px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                {/* Mobile hamburger menu */}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="lg:hidden mr-1"
+                  data-testid="mobile-menu-button"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleGoBack}
+                  data-testid="back-button"
+                  className="flex-shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <User className="text-primary w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                {resident.dischargeDate && (
-                  <p className="text-sm text-gray-500" data-testid="discharge-info">
-                    Discharged: {new Date(resident.dischargeDate).toLocaleDateString()}
-                    {resident.dischargeReason && ` - ${resident.dischargeReason}`}
-                  </p>
-                )}
+                
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                    <h1 className="text-base sm:text-xl font-semibold text-gray-900 truncate" data-testid="resident-name">
+                      {resident.firstName} {resident.lastInitial}.
+                    </h1>
+                    <Badge 
+                      variant={resident.status === 'active' ? 'default' : resident.status === 'graduated' ? 'secondary' : 'outline'}
+                      data-testid="resident-status"
+                      className="self-start sm:self-auto text-xs"
+                    >
+                      {resident.status || 'active'}
+                    </Badge>
+                  </div>
+                  {resident.dischargeDate && (
+                    <p className="text-xs sm:text-sm text-gray-500 truncate" data-testid="discharge-info">
+                      <span className="hidden sm:inline">Discharged: </span>
+                      {new Date(resident.dischargeDate).toLocaleDateString()}
+                      {resident.dischargeReason && (
+                        <span className="hidden sm:inline"> - {resident.dischargeReason}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="flex-1 p-6">
+        {/* Content Area - Mobile First */}
+        <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">
           <Switch>
             {/* Tracker Routes */}
             <Route path="/resident/:id/goals" component={GoalTracker} />
@@ -137,23 +173,23 @@ export default function ResidentDashboard() {
             <Route path="/resident/:id/meetings" component={MeetingTracker} />
             <Route path="/resident/:id/fees" component={ProgramFeesTracker} />
             
-            {/* Placeholder routes for new features */}
+            {/* Placeholder routes for new features - Mobile First */}
             <Route path="/resident/:id/reports">
-              <div className="bg-white p-6 rounded-lg border">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border">
                 <h2 className="text-lg font-semibold mb-4">Weekly Reports</h2>
-                <p className="text-gray-600">AI-generated weekly reports will appear here.</p>
+                <p className="text-sm sm:text-base text-gray-600">AI-generated weekly reports will appear here.</p>
               </div>
             </Route>
             
             <Route path="/resident/:id/pictures">
-              <div className="bg-white p-6 rounded-lg border">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border">
                 <h2 className="text-lg font-semibold mb-4">Pictures</h2>
-                <p className="text-gray-600">Uploaded pictures and scanned documents will appear here.</p>
+                <p className="text-sm sm:text-base text-gray-600">Uploaded pictures and scanned documents will appear here.</p>
               </div>
             </Route>
             
             <Route path="/resident/:id/notes">
-              <div className="bg-white p-6 rounded-lg border">
+              <div className="bg-white p-4 sm:p-6 rounded-lg border">
                 <NotesManagement 
                   residentId={resident.id} 
                   houseId={resident.house}
@@ -161,13 +197,14 @@ export default function ResidentDashboard() {
               </div>
             </Route>
             
-            {/* Default route shows overview */}
+            {/* Default route shows overview - Mobile First */}
             <Route>
-              <div className="space-y-6">
-                <div className="bg-white p-6 rounded-lg border">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="bg-white p-4 sm:p-6 rounded-lg border">
                   <h2 className="text-lg font-semibold mb-4">Welcome to {resident.firstName}'s Dashboard</h2>
-                  <p className="text-gray-600 mb-4">
-                    Use the sidebar to navigate between different sections:
+                  <p className="text-sm sm:text-base text-gray-600 mb-4">
+                    <span className="hidden sm:inline">Use the sidebar to navigate between different sections:</span>
+                    <span className="sm:hidden">Tap the menu button (☰) to navigate:</span>
                   </p>
                   <ul className="space-y-2 text-sm text-gray-600">
                     <li>• <strong>Weekly Reports:</strong> AI-generated summaries and reports</li>

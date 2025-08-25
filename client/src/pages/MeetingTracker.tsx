@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -287,112 +287,115 @@ export default function MeetingTracker() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-50" data-testid="meeting-tracker">
-      <header className="bg-white shadow-sm border-b">
-        <div className="px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={handleGoBack} data-testid="back-button">
-              <ArrowLeft className="w-4 h-4" />
+      <header className="bg-white shadow-sm border-b sticky top-0 z-20">
+        <div className="px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <Button variant="ghost" size="sm" onClick={handleGoBack} data-testid="back-button" className="flex-shrink-0">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Users className="text-indigo-600 w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Meeting Tracker</h2>
+                <p className="text-xs sm:text-sm text-gray-600 truncate">{resident.firstName} {resident.lastInitial}.</p>
+              </div>
+            </div>
+            <Button onClick={handleAddMeeting} data-testid="add-meeting-button" className="flex-shrink-0 h-9 sm:h-10 text-sm touch-manipulation">
+              <Plus className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Add Meeting</span>
+              <span className="sm:hidden">Add</span>
             </Button>
-            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-              <Users className="text-indigo-600 w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Meeting Tracker</h2>
-              <p className="text-sm text-gray-600">{resident.firstName} {resident.lastInitial}.</p>
-            </div>
           </div>
-          <Button onClick={handleAddMeeting} data-testid="add-meeting-button">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Meeting
-          </Button>
         </div>
       </header>
 
-      <main className="flex-1 p-4">
+      <main className="flex-1 p-3 sm:p-4">
         {meetings.length === 0 ? (
           <Card data-testid="no-meetings">
-            <CardContent className="pt-6 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Meetings Recorded</h4>
-              <p className="text-gray-600 mb-4">Track attendance at recovery meetings and therapy sessions.</p>
-              <Button onClick={handleAddMeeting} data-testid="add-first-meeting">
+            <CardContent className="pt-6 text-center px-4 sm:px-6">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+              <h4 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No Meetings Recorded</h4>
+              <p className="text-sm sm:text-base text-gray-600 mb-4">Track attendance at recovery meetings and therapy sessions.</p>
+              <Button onClick={handleAddMeeting} data-testid="add-first-meeting" className="h-10 touch-manipulation">
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Meeting
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4" data-testid="meetings-list">
+          <div className="space-y-3 sm:space-y-4" data-testid="meetings-list">
             {meetings.map((meeting) => (
-              <Card key={meeting.id} className="hover:shadow-md transition-shadow" data-testid={`meeting-card-${meeting.id}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Badge className={getMeetingTypeColor(meeting.meetingType)} data-testid="meeting-type">
-                          {meeting.meetingType.replace('_', ' ').toUpperCase()}
+              <Card key={meeting.id} className="hover:shadow-md transition-shadow touch-manipulation" data-testid={`meeting-card-${meeting.id}`}>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <Badge className={`${getMeetingTypeColor(meeting.meetingType)} text-xs`} data-testid="meeting-type">
+                        {meeting.meetingType.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                      {meeting.photoUrl && (
+                        <Badge variant="outline" className="flex items-center space-x-1 text-xs">
+                          <Image className="w-3 h-3" />
+                          <span>Photo</span>
                         </Badge>
-                        {meeting.photoUrl && (
-                          <Badge variant="outline" className="flex items-center space-x-1">
-                            <Image className="w-3 h-3" />
-                            <span>Photo</span>
-                          </Badge>
+                      )}
+                    </div>
+                    
+                    {meeting.notes && (
+                      <p className="text-xs sm:text-sm text-gray-600" data-testid="meeting-notes">
+                        {meeting.notes}
+                      </p>
+                    )}
+                    
+                    {meeting.photoUrl && (
+                      <div className="">
+                        <img 
+                          src={meeting.photoUrl} 
+                          alt="Meeting attendance verification" 
+                          className="w-24 h-18 sm:w-32 sm:h-24 object-cover rounded-lg border"
+                          data-testid="meeting-photo"
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                      <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                          <span data-testid="meeting-date">{formatDate(meeting.dateAttended)}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                          <span data-testid="meeting-duration">{formatDuration(meeting.duration)}</span>
+                        </div>
+                        {meeting.location && (
+                          <div className="flex items-center">
+                            <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                            <span data-testid="meeting-location" className="truncate">{meeting.location}</span>
+                          </div>
                         )}
                       </div>
-                      {meeting.notes && (
-                        <p className="text-sm text-gray-600 mb-2" data-testid="meeting-notes">
-                          {meeting.notes}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {meeting.photoUrl && (
-                    <div className="mb-3">
-                      <img 
-                        src={meeting.photoUrl} 
-                        alt="Meeting attendance verification" 
-                        className="w-32 h-24 object-cover rounded-lg border"
-                        data-testid="meeting-photo"
-                      />
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
-                        <span data-testid="meeting-date">{formatDate(meeting.dateAttended)}</span>
+                      <div className="flex items-center space-x-2 pt-2 sm:pt-0 border-t sm:border-t-0">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleEditMeeting(meeting)}
+                          data-testid={`edit-meeting-${meeting.id}`}
+                          className="h-8 text-xs sm:text-sm touch-manipulation"
+                        >
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 text-xs sm:text-sm touch-manipulation"
+                          onClick={() => handleDeleteMeeting(meeting.id)}
+                          data-testid={`delete-meeting-${meeting.id}`}
+                        >
+                          Delete
+                        </Button>
                       </div>
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        <span data-testid="meeting-duration">{formatDuration(meeting.duration)}</span>
-                      </div>
-                      {meeting.location && (
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          <span data-testid="meeting-location">{meeting.location}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleEditMeeting(meeting)}
-                        data-testid={`edit-meeting-${meeting.id}`}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleDeleteMeeting(meeting.id)}
-                        data-testid={`delete-meeting-${meeting.id}`}
-                      >
-                        Delete
-                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -402,19 +405,19 @@ export default function MeetingTracker() {
         )}
       </main>
 
-      {/* Meeting Dialog */}
+      {/* Meeting Dialog - Mobile First */}
       <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto mx-3 sm:mx-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">
               {editingMeeting ? 'Edit Meeting' : 'Add New Meeting'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="meetingType">Meeting Type</Label>
+              <Label htmlFor="meetingType" className="text-sm font-medium">Meeting Type</Label>
               <Select value={formData.meetingType} onValueChange={(value: 'aa' | 'na' | 'group_therapy' | 'individual_counseling' | 'house_meeting' | 'other') => setFormData(prev => ({ ...prev, meetingType: value }))}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11 sm:h-10 touch-manipulation">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -427,49 +430,53 @@ export default function MeetingTracker() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="dateAttended">Date Attended</Label>
+                <Label htmlFor="dateAttended" className="text-sm font-medium">Date Attended</Label>
                 <Input
                   id="dateAttended"
                   type="date"
                   value={formData.dateAttended}
                   onChange={(e) => setFormData(prev => ({ ...prev, dateAttended: e.target.value }))}
+                  className="h-11 sm:h-10 touch-manipulation"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Label htmlFor="duration" className="text-sm font-medium">Duration (minutes)</Label>
                 <Input
                   id="duration"
                   type="number"
                   value={formData.duration}
                   onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
                   placeholder="60"
+                  className="h-11 sm:h-10 touch-manipulation"
                 />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className="text-sm font-medium">Location</Label>
               <Input
                 id="location"
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="Meeting location (optional)"
+                className="h-11 sm:h-10 touch-manipulation"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes" className="text-sm font-medium">Notes</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Additional notes (optional)"
                 rows={3}
+                className="min-h-[80px] touch-manipulation"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label>Meeting Attendance Photo (Optional)</Label>
+              <Label className="text-sm font-medium">Meeting Attendance Photo (Optional)</Label>
               <div className="space-y-3">
                 {formData.photoUrl ? (
                   <div className="space-y-2">
@@ -481,7 +488,7 @@ export default function MeetingTracker() {
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}
-                        className="absolute top-2 right-2 text-green-600 hover:text-green-800"
+                        className="absolute top-2 right-2 text-green-600 hover:text-green-800 p-1 touch-manipulation"
                         data-testid="remove-photo"
                       >
                         ×
@@ -500,11 +507,11 @@ export default function MeetingTracker() {
                     maxFileSize={10485760} // 10MB
                     onGetUploadParameters={handleGetUploadParameters}
                     onComplete={handlePhotoUploadComplete}
-                    buttonClassName="w-full"
+                    buttonClassName="w-full h-11 sm:h-10 touch-manipulation"
                   >
                     <div className="flex items-center justify-center space-x-2">
                       <Camera className="w-4 h-4" />
-                      <span>Upload Meeting Photo</span>
+                      <span className="text-sm sm:text-base">Upload Meeting Photo</span>
                     </div>
                   </ObjectUploader>
                 )}
@@ -514,11 +521,11 @@ export default function MeetingTracker() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowMeetingDialog(false)} className="w-full sm:w-auto h-11 sm:h-10 touch-manipulation">
               Cancel
             </Button>
-            <Button onClick={handleSaveMeeting} disabled={isSaving || !formData.dateAttended}>
+            <Button onClick={handleSaveMeeting} disabled={isSaving || !formData.dateAttended} className="w-full sm:w-auto h-11 sm:h-10 touch-manipulation">
               {isSaving ? 'Saving...' : editingMeeting ? 'Update Meeting' : 'Create Meeting'}
             </Button>
           </DialogFooter>

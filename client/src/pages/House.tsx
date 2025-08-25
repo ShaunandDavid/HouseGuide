@@ -148,47 +148,49 @@ export default function House() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-50" data-testid="house-page">
-      {/* Navigation Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Home className="text-white text-sm" />
+      {/* Navigation Header - Mobile First */}
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+              <Home className="text-white text-sm sm:text-base" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900" data-testid="house-name">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate" data-testid="house-name">
                 {house?.name?.includes('Dashboard') ? house.name.replace('Dashboard', 'Facility') : (house?.name ?? 'Loading...')}
               </h2>
-              <p className="text-sm text-gray-600">Residential Care Management</p>
+              <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Residential Care Management</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" data-testid="settings-button">
+          <Button variant="ghost" size="sm" className="flex-shrink-0" data-testid="settings-button">
             <Settings className="w-4 h-4" />
           </Button>
         </div>
       </header>
 
-      {/* Setup Section - Show if house name contains 'Dashboard' */}
+      {/* Setup Section - Mobile First */}
       {house?.name?.includes('Dashboard') && (
-        <div className="bg-blue-50 border-b border-blue-200 p-4">
+        <div className="bg-blue-50 border-b border-blue-200 p-3 sm:p-4">
           <Card className="max-w-2xl mx-auto">
-            <CardContent className="pt-6">
-              <div className="flex items-start space-x-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+            <CardContent className="pt-4 sm:pt-6">
+              <div className="flex flex-col sm:flex-row items-start space-y-3 sm:space-y-0 sm:space-x-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Home className="w-5 h-5 text-blue-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Complete Your Setup</h3>
-                  <p className="text-gray-600 mb-4">Give your facility a name and start onboarding residents.</p>
-                  <div className="flex items-center space-x-3">
-                    <Button size="sm" variant="outline">
+                <div className="flex-1 w-full">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Complete Your Setup</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-4">Give your facility a name and start onboarding residents.</p>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                    <Button size="sm" variant="outline" className="w-full sm:w-auto">
                       <Settings className="w-4 h-4 mr-2" />
-                      Rename Facility
+                      <span className="hidden sm:inline">Rename Facility</span>
+                      <span className="sm:hidden">Rename</span>
                     </Button>
-                    <Link href={`/dashboard/onboard`}>
-                      <Button size="sm">
+                    <Link href={`/dashboard/onboard`} className="w-full sm:w-auto">
+                      <Button size="sm" className="w-full sm:w-auto">
                         <UserPlus className="w-4 h-4 mr-2" />
-                        Add First Resident
+                        <span className="hidden sm:inline">Add First Resident</span>
+                        <span className="sm:hidden">Add Resident</span>
                       </Button>
                     </Link>
                   </div>
@@ -199,70 +201,81 @@ export default function House() {
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 p-4">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Residents</h3>
-            <p className="text-gray-600">Manage resident files and weekly reports</p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setShowComprehensiveReport(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              data-testid="button-comprehensive-report"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Director Report
-            </Button>
-            <Link href={`/dashboard/onboard`}>
-              <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-resident">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add New Resident
+      {/* Main Content - Mobile First */}
+      <main className="flex-1 p-3 sm:p-4">
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1 sm:mb-2">Residents</h3>
+              <p className="text-sm sm:text-base text-gray-600">Manage resident files and weekly reports</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+              <Button
+                onClick={() => setShowComprehensiveReport(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white h-10 sm:h-9"
+                data-testid="button-comprehensive-report"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Director Report</span>
+                <span className="sm:hidden">Report</span>
               </Button>
-            </Link>
+              <Link href={`/dashboard/onboard`} className="w-full sm:w-auto">
+                <Button className="bg-primary hover:bg-primary/90 w-full sm:w-auto h-10 sm:h-9" data-testid="button-add-resident">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">Add New Resident</span>
+                  <span className="sm:hidden">Add Resident</span>
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* Status Filter */}
-        <div className="mb-4 flex items-center space-x-2">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Filter by status:</span>
-          <div className="flex space-x-2">
+        {/* Status Filter - Mobile First */}
+        <div className="mb-4 space-y-2 sm:space-y-0">
+          <div className="flex items-center space-x-2 mb-2 sm:mb-0">
+            <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-medium text-gray-700">Filter by status:</span>
+          </div>
+          <div className="grid grid-cols-2 sm:flex gap-2 sm:space-x-2">
             <Button
               variant={statusFilter === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setStatusFilter('all')}
+              className="text-xs sm:text-sm h-8 sm:h-auto"
               data-testid="filter-all-residents"
             >
-              All ({residents.length})
+              <span className="sm:hidden">All</span>
+              <span className="hidden sm:inline">All ({residents.length})</span>
             </Button>
             <Button
               variant={statusFilter === 'active' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setStatusFilter('active')}
-              className={statusFilter === 'active' ? 'bg-green-600 hover:bg-green-700' : 'text-green-700 border-green-300 hover:bg-green-50'}
+              className={`text-xs sm:text-sm h-8 sm:h-auto ${statusFilter === 'active' ? 'bg-green-600 hover:bg-green-700' : 'text-green-700 border-green-300 hover:bg-green-50'}`}
               data-testid="filter-active-residents"
             >
-              Active ({residents.filter(r => (r.status || 'active') === 'active').length})
+              <span className="sm:hidden">Active</span>
+              <span className="hidden sm:inline">Active ({residents.filter(r => (r.status || 'active') === 'active').length})</span>
             </Button>
             <Button
               variant={statusFilter === 'inactive' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setStatusFilter('inactive')}
-              className={statusFilter === 'inactive' ? 'bg-gray-600 hover:bg-gray-700' : 'text-gray-700 border-gray-300 hover:bg-gray-50'}
+              className={`text-xs sm:text-sm h-8 sm:h-auto ${statusFilter === 'inactive' ? 'bg-gray-600 hover:bg-gray-700' : 'text-gray-700 border-gray-300 hover:bg-gray-50'}`}
               data-testid="filter-inactive-residents"
             >
-              Inactive ({residents.filter(r => r.status === 'inactive').length})
+              <span className="sm:hidden">Inactive</span>
+              <span className="hidden sm:inline">Inactive ({residents.filter(r => r.status === 'inactive').length})</span>
             </Button>
             <Button
               variant={statusFilter === 'graduated' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setStatusFilter('graduated')}
-              className={statusFilter === 'graduated' ? 'bg-blue-600 hover:bg-blue-700' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}
+              className={`text-xs sm:text-sm h-8 sm:h-auto ${statusFilter === 'graduated' ? 'bg-blue-600 hover:bg-blue-700' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}`}
               data-testid="filter-graduated-residents"
             >
-              Graduated ({residents.filter(r => r.status === 'graduated').length})
+              <span className="sm:hidden">Graduated</span>
+              <span className="hidden sm:inline">Graduated ({residents.filter(r => r.status === 'graduated').length})</span>
             </Button>
           </div>
         </div>
@@ -301,38 +314,42 @@ export default function House() {
                 href={`/resident/${resident.id}`}
                 data-testid={`resident-card-${resident.id}`}
               >
-                <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardContent className="p-4">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer touch-manipulation">
+                  <CardContent className="p-3 sm:p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                          <User className="text-primary w-5 h-5" />
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User className="text-primary w-4 h-4 sm:w-5 sm:h-5" />
                         </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900" data-testid="resident-name">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate" data-testid="resident-name">
                             {resident.firstName} {resident.lastInitial}.
                           </h4>
-                          <p className="text-sm text-gray-600" data-testid="resident-status">
+                          <p className="text-xs sm:text-sm text-gray-600" data-testid="resident-status">
                             {resident.status || 'Active'}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          variant="secondary"
-                          className="bg-green-100 text-green-800"
-                          data-testid="commitment-count"
-                        >
-                          {resident.commitmentCount} Commitments
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className="bg-amber-100 text-amber-800"
-                          data-testid="writeup-count"
-                        >
-                          {resident.writeupCount} Write-ups
-                        </Badge>
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                        <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-800 text-xs px-1 sm:px-2"
+                            data-testid="commitment-count"
+                          >
+                            <span className="sm:hidden">{resident.commitmentCount}C</span>
+                            <span className="hidden sm:inline">{resident.commitmentCount} Commitments</span>
+                          </Badge>
+                          <Badge
+                            variant="secondary"
+                            className="bg-amber-100 text-amber-800 text-xs px-1 sm:px-2"
+                            data-testid="writeup-count"
+                          >
+                            <span className="sm:hidden">{resident.writeupCount}W</span>
+                            <span className="hidden sm:inline">{resident.writeupCount} Write-ups</span>
+                          </Badge>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400 ml-2" />
                       </div>
                     </div>
                   </CardContent>

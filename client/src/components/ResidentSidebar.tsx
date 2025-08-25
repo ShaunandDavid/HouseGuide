@@ -374,28 +374,26 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
 
   return (
     <div 
-      className={cn(
-        "bg-white border-r border-gray-200 h-full flex flex-col transition-all duration-300",
-        isCollapsed ? "w-16" : "w-64"
-      )}
+      className="bg-white border-r border-gray-200 h-full flex flex-col w-64 sm:w-72 lg:w-64"
       data-testid="resident-sidebar"
     >
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        {!isCollapsed && (
-          <h3 className="font-semibold text-gray-900">Navigation</h3>
-        )}
+      {/* Header - Mobile First */}
+      <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Navigation</h3>
         <Button
           variant="ghost"
           size="sm"
           onClick={onToggle}
           data-testid="sidebar-toggle"
+          className="lg:hidden"
         >
-          <PanelLeft className="w-4 h-4" />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </Button>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation - Mobile First */}
       <ScrollArea className="flex-1 p-2">
         <div className="space-y-1">
           {folders.map((folder) => {
@@ -405,7 +403,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
             const entries = getEntries(folder);
 
             if (folder.items) {
-              // Trackers folder with subitems
+              // Trackers folder with subitems - Mobile optimized
               return (
                 <Collapsible
                   key={folder.id}
@@ -415,26 +413,19 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                   <CollapsibleTrigger asChild>
                     <Button
                       variant="ghost"
-                      className={cn(
-                        "w-full justify-start text-gray-700 hover:bg-gray-100",
-                        isCollapsed && "px-2"
-                      )}
+                      className="w-full justify-start text-gray-700 hover:bg-gray-100 h-10 sm:h-9 touch-manipulation"
                       data-testid={`folder-${folder.id}`}
                     >
-                      <Icon className="w-4 h-4 mr-2 flex-shrink-0" />
-                      {!isCollapsed && (
-                        <>
-                          <span className="flex-1 text-left">{folder.title}</span>
-                          {isOpen ? (
-                            <ChevronDown className="w-4 h-4" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                        </>
+                      <Icon className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="flex-1 text-left text-sm sm:text-base">{folder.title}</span>
+                      {isOpen ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
                       )}
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className={cn("pl-4", isCollapsed && "hidden")}>
+                  <CollapsibleContent className="pl-4">
                     <div className="space-y-1">
                       {folder.items.map((item) => {
                         const ItemIcon = item.icon;
@@ -453,14 +444,14 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                                   <Button
                                     variant="ghost"
                                     className={cn(
-                                      "flex-1 justify-start text-sm",
+                                      "flex-1 justify-start text-sm h-9 touch-manipulation",
                                       getColorClasses(item.color)
                                     )}
                                     data-testid={`nav-${item.id}`}
                                   >
                                     <ItemIcon className="w-3 h-3 mr-2" />
                                     <span className="flex-1 text-left">{item.title}</span>
-                                    <Badge variant={getBadgeVariant(item.color)} className="mr-1 text-xs">
+                                    <Badge variant={getBadgeVariant(item.color)} className="mr-1 text-xs px-1.5">
                                       {itemCount}
                                     </Badge>
                                     {isItemOpen ? (
@@ -473,7 +464,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="p-1 h-6 w-6"
+                                  className="p-1.5 h-8 w-8 touch-manipulation"
                                   onClick={() => setLocation(item.path)}
                                   data-testid={`add-${item.id}`}
                                 >
@@ -484,7 +475,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                               <CollapsibleContent className="pl-4 mt-1">
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
                                   {trackerEntries.length === 0 ? (
-                                    <div className="text-xs text-gray-500 py-2 px-3">
+                                    <div className="text-xs text-gray-500 py-3 px-3">
                                       No entries yet
                                     </div>
                                   ) : (
@@ -492,7 +483,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                                       <div
                                         key={entry.id}
                                         className={cn(
-                                          "p-2 rounded text-xs border cursor-pointer transition-colors",
+                                          "p-3 rounded text-xs border cursor-pointer transition-colors touch-manipulation",
                                           getColorClasses(item.color)
                                         )}
                                         onClick={() => handleEntryClick(entry)}
@@ -500,9 +491,9 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                                       >
                                         <div className="font-medium truncate">{entry.title}</div>
                                         {entry.subtitle && (
-                                          <div className="text-gray-500 truncate">{entry.subtitle}</div>
+                                          <div className="text-gray-500 truncate mt-1">{entry.subtitle}</div>
                                         )}
-                                        <div className="text-gray-400 mt-1">
+                                        <div className="text-gray-400 mt-2">
                                           {formatTimestamp(entry.timestamp)}
                                         </div>
                                       </div>
@@ -512,7 +503,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="w-full text-xs"
+                                      className="w-full text-xs h-8 touch-manipulation"
                                       onClick={() => setLocation(item.path)}
                                     >
                                       View all {trackerEntries.length} items
@@ -529,7 +520,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                 </Collapsible>
               );
             } else {
-              // Simple folder with entries
+              // Simple folder with entries - Mobile optimized
               return (
                 <Collapsible
                   key={folder.id}
@@ -540,45 +531,36 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                     <CollapsibleTrigger asChild>
                       <Button
                         variant="ghost"
-                        className={cn(
-                          "flex-1 justify-start text-gray-700 hover:bg-gray-100",
-                          isCollapsed && "px-2"
-                        )}
+                        className="flex-1 justify-start text-gray-700 hover:bg-gray-100 h-10 sm:h-9 touch-manipulation"
                         data-testid={`folder-${folder.id}`}
                       >
-                        <Icon className="w-4 h-4 mr-2 flex-shrink-0" />
-                        {!isCollapsed && (
-                          <>
-                            <span className="flex-1 text-left">{folder.title}</span>
-                            <Badge variant="outline" className="mr-1 text-xs">
-                              {entryCount}
-                            </Badge>
-                            {isOpen ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </>
+                        <Icon className="w-4 h-4 mr-3 flex-shrink-0" />
+                        <span className="flex-1 text-left text-sm sm:text-base">{folder.title}</span>
+                        <Badge variant="outline" className="mr-1 text-xs px-1.5">
+                          {entryCount}
+                        </Badge>
+                        {isOpen ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
                         )}
                       </Button>
                     </CollapsibleTrigger>
-                    {!isCollapsed && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 h-6 w-6"
-                        onClick={() => folder.path && setLocation(folder.path)}
-                        data-testid={`add-${folder.id}`}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-1.5 h-8 w-8 touch-manipulation"
+                      onClick={() => folder.path && setLocation(folder.path)}
+                      data-testid={`add-${folder.id}`}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </Button>
                   </div>
                   
-                  <CollapsibleContent className={cn("pl-6 mt-1", isCollapsed && "hidden")}>
+                  <CollapsibleContent className="pl-6 mt-1">
                     <div className="space-y-1 max-h-48 overflow-y-auto">
                       {entries.length === 0 ? (
-                        <div className="text-xs text-gray-500 py-2 px-3">
+                        <div className="text-xs text-gray-500 py-3 px-3">
                           No entries yet
                         </div>
                       ) : (
@@ -588,7 +570,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                             <div
                               key={entry.id}
                               className={cn(
-                                "p-2 rounded text-xs border cursor-pointer transition-colors",
+                                "p-3 rounded text-xs border cursor-pointer transition-colors touch-manipulation",
                                 colorClass
                               )}
                               onClick={() => handleEntryClick(entry)}
@@ -596,9 +578,9 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                             >
                               <div className="font-medium truncate">{entry.title}</div>
                               {entry.subtitle && (
-                                <div className="text-gray-500 truncate">{entry.subtitle}</div>
+                                <div className="text-gray-500 truncate mt-1">{entry.subtitle}</div>
                               )}
-                              <div className="text-gray-400 mt-1">
+                              <div className="text-gray-400 mt-2">
                                 {formatTimestamp(entry.timestamp)}
                               </div>
                             </div>
@@ -609,7 +591,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-full text-xs"
+                          className="w-full text-xs h-8 touch-manipulation"
                           onClick={() => folder.path && setLocation(folder.path)}
                         >
                           View all {entries.length} items
