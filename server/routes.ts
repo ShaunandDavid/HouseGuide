@@ -1127,14 +1127,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Collect all data for the week
-      const [goals, chores, accomplishments, incidents, meetings, programFees, notes] = await Promise.all([
+      const [goals, chores, accomplishments, incidents, meetings, programFees, notes, checklist] = await Promise.all([
         storage.getGoalsByResident(residentId),
         storage.getChoresByResident(residentId),
         storage.getAccomplishmentsByResident(residentId),
         storage.getIncidentsByResident(residentId),
         storage.getMeetingsByResident(residentId),
         storage.getProgramFeesByResident(residentId),
-        storage.getNotesByResident(residentId)
+        storage.getNotesByResident(residentId),
+        storage.getChecklistByResident(residentId)
       ]);
 
       // Filter data to the specified week (basic implementation)
@@ -1169,7 +1170,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           incidents: filterByWeek(incidents, 'dateOccurred'),
           meetings: filterByWeek(meetings, 'dateAttended'),
           programFees: filterByWeek(programFees, 'dueDate'),
-          notes: filterByWeek(notes, 'created')
+          notes: filterByWeek(notes, 'created'),
+          checklist: checklist // Include current checklist status
         }
       };
 

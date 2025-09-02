@@ -31,6 +31,7 @@ export interface WeeklyReportData {
     meetings: any[];
     programFees: any[];
     notes: any[];
+    checklist: any;
   };
 }
 
