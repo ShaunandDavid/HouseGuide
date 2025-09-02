@@ -49,8 +49,27 @@ export function DocumentScanModal({
       const result = await processImageWithOCR(file, setOcrProgress);
       setOcrResult(result.text);
       
-      const classificationResult = classifyDocumentByKeywords(result.text);
-      setClassification(classificationResult);
+      // Try AI classification first, fallback to keywords
+      try {
+        const response = await fetch('/api/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: result.text })
+        });
+        
+        if (response.ok) {
+          const aiResult = await response.json();
+          setClassification(aiResult);
+        } else {
+          // Fallback to keyword classification
+          const classificationResult = classifyDocumentByKeywords(result.text);
+          setClassification(classificationResult);
+        }
+      } catch (error) {
+        // Fallback to keyword classification
+        const classificationResult = classifyDocumentByKeywords(result.text);
+        setClassification(classificationResult);
+      }
     } catch (error) {
       // OCR processing failed - handled in UI
       toast({

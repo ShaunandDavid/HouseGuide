@@ -71,6 +71,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // AI Classification endpoint
+  app.post("/api/classify", requireAuth, async (req: any, res) => {
+    try {
+      const { text } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      if (!process.env.OPENAI_API_KEY) {
+        // Fallback to keyword classification if no AI key
+        const classifyModule = await import('./classify-keywords.js');
+        const result = classifyModule.classifyDocumentByKeywords(text);
+        return res.json(result);
+      }
+
+      // Use OpenAI for better classification
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at classifying sober living facility documents. Classify the document as either 'commitment' (goals, pledges, recovery plans, AA/NA step work) or 'writeup' (incidents, violations, warnings, disciplinary actions). Respond with JSON: {label: 'commitment' or 'writeup', confidence: 0-1}"
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        max_tokens: 100
+      });
+
+      const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+      res.json(result);
+    } catch (error) {
+      console.error('Classification error:', error);
+      // Fallback to keyword classification
+      const classifyModule = await import('./classify-keywords.js');
+      const result = classifyModule.classifyDocumentByKeywords(req.body.text || '');
+      res.json(result);
+    }
+  });
+
   // Admin drill endpoints
   const { drillRoutes } = await import('./emergency-drill');
   app.post('/api/admin/drill', drillRoutes.startDrill);
