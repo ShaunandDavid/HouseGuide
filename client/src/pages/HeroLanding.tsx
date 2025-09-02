@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, ArrowRight, CheckCircle, Users, FileText, Brain, Smartphone } from "lucide-react";
+import { Shield, ArrowRight, CheckCircle, Users, FileText, Brain, Smartphone, Download } from "lucide-react";
 import { Link } from "wouter";
 import heroImage from "@assets/Gemini_Generated_Image_y12y9jy12y9jy12y_1756850005074.png";
 
@@ -76,9 +76,19 @@ export default function HeroLanding() {
                     </Button>
                   </Link>
                   
-                  <p className="text-blue-100 text-sm">
-                    No credit card required • 30-day free trial
-                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                    <p className="text-blue-100 text-sm">
+                      No credit card required • 30-day free trial
+                    </p>
+                    <a 
+                      href="/HIPAA_Compliance_Binder_1756850255321.zip" 
+                      download
+                      className="flex items-center space-x-2 text-blue-200 hover:text-white transition-colors text-sm group"
+                    >
+                      <Download className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
+                      <span>Download Compliance Binder</span>
+                    </a>
+                  </div>
                 </div>
               </div>
 
