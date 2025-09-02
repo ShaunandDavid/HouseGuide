@@ -1,0 +1,549 @@
+🏠 HOUSEGUIDE OPERATIONS HANDBOOK
+================================================================
+Complete guide for daily troubleshooting, maintenance, and operations
+
+📋 TABLE OF CONTENTS
+1. Production Hardening Checklist
+2. Operational Flow (Day-to-Day)
+3. Emergency Procedures
+4. System Architecture Overview
+5. Troubleshooting Guide
+6. API Reference
+7. Database Management
+8. Monitoring & Alerts
+
+================================================================
+🚀 PRODUCTION HARDENING CHECKLIST
+================================================================
+
+MONITORING & ALERTS
+--------------------
+□ UptimeRobot monitoring configured for main endpoints
+□ Replit logs alerts enabled for critical errors
+□ Weekly uptime reports automated
+□ Performance monitoring dashboard active
+□ Error rate thresholds configured
+
+BACKUP & RECOVERY
+------------------
+□ Neon PostgreSQL daily snapshots automated
+□ Database backup verification weekly
+□ Recovery procedure tested monthly
+□ Data retention policy documented (30-90 days)
+□ Point-in-time recovery tested
+
+ERROR LOGGING & MONITORING
+---------------------------
+□ Winston logger implemented for server errors
+□ Sentry error tracking integrated
+□ Log rotation configured (1GB max)
+□ Critical error notifications to dev team
+□ Performance metrics collection
+
+SECURITY & RATE LIMITING
+-------------------------
+□ express-rate-limit confirmed in production config
+□ CORS properly configured for production domains
+□ Helmet security headers enabled
+□ API rate limits: 100 requests/minute per IP
+□ Authentication timeout: 24 hours
+
+SECRETS & KEY MANAGEMENT
+------------------------
+□ JWT_SECRET rotated quarterly
+□ OPENAI_API_KEY rotated quarterly
+□ SENDGRID_API_KEY monitored for usage limits
+□ DATABASE_URL secured with read/write permissions
+□ Environment variables encrypted at rest
+
+================================================================
+📦 OPERATIONAL FLOW (DAY-TO-DAY)
+================================================================
+
+NEW FACILITY ONBOARDING
+------------------------
+1. Create house record:
+   POST /api/houses
+   {
+     "name": "Facility Name",
+     "address": "Full Address",
+     "capacity": 20
+   }
+
+2. Add residents:
+   POST /api/residents
+   {
+     "name": "Resident Name",
+     "houseId": "house-uuid",
+     "admissionDate": "2025-09-01"
+   }
+
+3. Enable all 8 trackers:
+   - Goals (/api/goals)
+   - Chores (/api/chores)
+   - Incidents (/api/incidents)
+   - Meetings (/api/meetings)
+   - Accomplishments (/api/accomplishments)
+   - Checklists (/api/checklists)
+   - Program Fees (/api/fees)
+   - Notes (/api/notes)
+
+WEEKLY OPERATIONS
+-----------------
+1. Generate weekly reports for all residents:
+   POST /api/reports/weekly/generate
+   {
+     "residentId": "resident-uuid",
+     "weekStart": "2025-09-01",
+     "weekEnd": "2025-09-07"
+   }
+
+2. Distribute reports:
+   - Export to PDF (via report endpoint)
+   - Email to facility managers
+   - Archive in system for compliance
+
+3. Review system metrics:
+   - Database storage usage
+   - API response times
+   - Error rates
+   - User activity levels
+
+ISSUE RESOLUTION WORKFLOW
+--------------------------
+1. Issue reported → Check system health immediately
+2. Follow specific troubleshooting guide (see below)
+3. Document resolution in operations log
+4. Update procedures if new issue discovered
+5. Notify affected facilities of resolution
+
+SYSTEM MAINTENANCE
+------------------
+Daily:
+- Health check (curl api/health)
+- Error log review
+- Database connection verification
+
+Weekly:
+- Performance metrics review
+- Backup verification
+- Security scan results
+
+Monthly:
+- Dependencies update review
+- Database optimization
+- User access audit
+
+================================================================
+🚨 EMERGENCY PROCEDURES
+================================================================
+
+SYSTEM DOWN (CRITICAL)
+-----------------------
+Priority 1 - Immediate Response (0-5 minutes):
+1. Check Replit console workflow status
+2. Restart "Start application" workflow
+3. Verify DATABASE_URL environment variable
+4. Check Neon database dashboard for outages
+
+Priority 2 - System Recovery (5-15 minutes):
+1. Test database connectivity:
+   curl http://localhost:5000/api/health
+2. Verify all environment secrets:
+   - DATABASE_URL
+   - OPENAI_API_KEY
+   - SENDGRID_API_KEY
+   - JWT_SECRET
+3. Check server logs for specific errors
+4. Test authentication endpoint
+
+Priority 3 - Service Restoration (15-30 minutes):
+1. Test all critical endpoints
+2. Verify data integrity
+3. Confirm AI services operational
+4. Test mobile UI responsiveness
+5. Notify users of restoration
+
+DATABASE CONNECTION LOST
+-------------------------
+1. Check DATABASE_URL is properly set
+2. Verify Neon database status
+3. Test connection: curl http://localhost:5000/api/health
+4. If connection fails: npm run db:push --force
+5. Verify all tables exist and have data
+6. Test read/write operations
+
+AUTHENTICATION SYSTEM FAILURE
+------------------------------
+1. Verify JWT_SECRET environment variable
+2. Test with known credentials:
+   Level7mediaofficial@gmail.com / password123
+3. Check for token expiration issues
+4. Verify bcrypt password hashing
+5. Clear browser cookies and retry
+6. Check rate limiting not blocking requests
+
+AI CLASSIFICATION DOWN
+----------------------
+1. Verify OPENAI_API_KEY is valid
+2. Check OpenAI API status dashboard
+3. Test with manual classification endpoint
+4. Verify API quota not exceeded
+5. Fallback to manual document categorization
+6. Monitor for service restoration
+
+================================================================
+🏗️ SYSTEM ARCHITECTURE OVERVIEW
+================================================================
+
+TECHNOLOGY STACK
+-----------------
+Frontend: React 18.3.1 + TypeScript 5.6.3 + Vite 5.4.19
+Backend: Node.js + Express 4.21.2 + TypeScript
+Database: PostgreSQL via Neon (@neondatabase/serverless 0.10.4)
+ORM: Drizzle 0.39.1 with Drizzle Kit 0.30.4
+Authentication: JWT + bcrypt
+AI: OpenAI GPT-5 (5.15.0)
+OCR: Tesseract.js 6.0.1
+File Storage: Google Cloud Storage ready
+
+DATABASE SCHEMA (14 Tables)
+----------------------------
+Core:
+- houses (4 records)
+- guides (2 records)
+- residents (5 records)
+
+Tracking:
+- goals (3 records)
+- chores (2 records)
+- incidents (2 records)
+- meetings (2 records)
+- accomplishments (2 records)
+- checklists (1 record)
+- program_fees (3 records)
+- notes (12 records)
+
+Files & Reports:
+- files (0 records)
+- weekly_reports (0 records)
+
+API ARCHITECTURE
+----------------
+Authentication: /api/login, /api/logout, /api/me
+Residents: /api/residents/* (CRUD operations)
+Trackers: /api/{module}/by-resident/:id (8 modules)
+Reports: /api/reports/weekly/* (AI generation)
+Classification: /api/classify (AI document processing)
+
+================================================================
+🔍 TROUBLESHOOTING GUIDE
+================================================================
+
+COMMON ISSUES & STEP-BY-STEP SOLUTIONS
+
+1. "Cannot connect to database"
+   Steps:
+   a) Check DATABASE_URL: echo $DATABASE_URL
+   b) Test connection: curl http://localhost:5000/api/health
+   c) Check Neon dashboard for outages
+   d) Restart application: npm run dev
+   e) Force schema sync: npm run db:push --force
+
+2. "Authentication failed" / "TOKEN_VERIFY_FAIL"
+   Steps:
+   a) Verify JWT_SECRET is set
+   b) Test with demo credentials
+   c) Clear browser cookies
+   d) Check token expiration (24 hours)
+   e) Verify rate limiting not blocking
+
+3. "OCR processing failed"
+   Steps:
+   a) Check image file size (< 10MB)
+   b) Verify supported format (jpg, png, pdf)
+   c) Test with different image
+   d) Use manual text entry as fallback
+   e) Check browser memory usage
+
+4. "AI classification not working"
+   Steps:
+   a) Verify OPENAI_API_KEY is valid
+   b) Check OpenAI API status
+   c) Test API quota limits
+   d) Use manual categorization
+   e) Check network connectivity
+
+5. "Cannot save tracker data"
+   Steps:
+   a) Check specific API endpoint status
+   b) Verify request format and required fields
+   c) Test database write permissions
+   d) Check for validation errors
+   e) Review server logs for detailed error
+
+6. "Weekly reports not generating"
+   Steps:
+   a) Verify OPENAI_API_KEY
+   b) Check data exists for date range
+   c) Test individual tracker endpoints
+   d) Verify all 8 modules accessible
+   e) Check report generation logs
+
+================================================================
+📚 API REFERENCE
+================================================================
+
+HEALTH & STATUS
+---------------
+GET /api/health
+Response: {"status":"ok","database":"connected","timestamp":"..."}
+
+AUTHENTICATION
+--------------
+POST /api/login
+Body: {"email":"user@example.com","password":"password"}
+Response: {"token":"jwt-token","user":{...}}
+
+POST /api/logout
+Response: {"message":"Logged out successfully"}
+
+GET /api/me
+Headers: Authorization: Bearer <token>
+Response: {"id":"...","email":"...","houseId":"..."}
+
+RESIDENTS MANAGEMENT
+--------------------
+GET /api/residents
+Response: [{"id":"...","name":"...","houseId":"..."}]
+
+POST /api/residents
+Body: {"name":"John Doe","houseId":"uuid","admissionDate":"2025-09-01"}
+
+GET /api/residents/:id
+Response: {"id":"...","name":"...","createdAt":"..."}
+
+TRACKING MODULES (8 modules)
+----------------------------
+Pattern: /api/{module}/by-resident/:residentId
+
+Goals:
+GET /api/goals/by-resident/:id
+POST /api/goals
+Body: {"residentId":"uuid","houseId":"uuid","goalText":"...","status":"active"}
+
+Chores:
+GET /api/chores/by-resident/:id
+POST /api/chores
+Body: {"residentId":"uuid","choreName":"...","status":"pending"}
+
+Incidents:
+GET /api/incidents/by-resident/:id
+POST /api/incidents
+Body: {"residentId":"uuid","incidentType":"...","description":"..."}
+
+Meetings:
+GET /api/meetings/by-resident/:id
+POST /api/meetings
+Body: {"residentId":"uuid","meetingType":"...","notes":"..."}
+
+Accomplishments:
+GET /api/accomplishments/by-resident/:id
+POST /api/accomplishments
+Body: {"residentId":"uuid","category":"...","description":"..."}
+
+Checklists:
+GET /api/checklists/by-resident/:id
+POST /api/checklists
+Body: {"residentId":"uuid","checklistType":"...","items":[...]}
+
+Program Fees:
+GET /api/fees/by-resident/:id
+POST /api/fees
+Body: {"residentId":"uuid","feeType":"...","amount":100.00,"status":"pending"}
+
+Notes:
+GET /api/notes/by-resident/:id
+POST /api/notes
+Body: {"residentId":"uuid","content":"...","category":"general"}
+
+REPORTS & AI
+------------
+POST /api/reports/weekly/generate
+Body: {"residentId":"uuid","weekStart":"2025-09-01","weekEnd":"2025-09-07"}
+Response: {"report":"Generated AI report content..."}
+
+GET /api/reports/weekly/by-resident/:id
+Response: [{"id":"...","weekStart":"...","content":"..."}]
+
+POST /api/classify
+Body: {"text":"Document content to classify..."}
+Response: {"classification":"commitment","confidence":0.85}
+
+================================================================
+💾 DATABASE MANAGEMENT
+================================================================
+
+SCHEMA SYNCHRONIZATION
+----------------------
+Safe sync (recommended):
+npm run db:push
+
+Force sync (if conflicts):
+npm run db:push --force
+
+BACKUP PROCEDURES
+-----------------
+Daily automated backups via Neon PostgreSQL
+Manual backup command:
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
+
+Restore from backup:
+psql $DATABASE_URL < backup_20250902.sql
+
+DATA VERIFICATION QUERIES
+--------------------------
+Check table sizes:
+SELECT schemaname, tablename, 
+       pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
+FROM pg_tables WHERE schemaname = 'public';
+
+Check record counts:
+SELECT 'houses' as table_name, COUNT(*) FROM houses
+UNION ALL SELECT 'residents', COUNT(*) FROM residents
+-- ... repeat for all tables
+
+MAINTENANCE TASKS
+-----------------
+Weekly:
+- Vacuum tables for performance
+- Analyze query performance
+- Check for orphaned records
+- Verify foreign key constraints
+
+Monthly:
+- Reindex heavily used tables
+- Archive old data (>90 days)
+- Update statistics
+- Performance optimization review
+
+================================================================
+📊 MONITORING & ALERTS
+================================================================
+
+KEY METRICS TO MONITOR
+-----------------------
+System Health:
+- API response time (< 500ms average)
+- Database connection count (< 80% max)
+- Memory usage (< 80% available)
+- Disk space (< 80% full)
+
+Business Metrics:
+- Daily active users
+- Documents processed per day
+- AI classification accuracy
+- Weekly reports generated
+
+Error Tracking:
+- HTTP 5xx error rate (< 1%)
+- Database connection failures
+- Authentication failures
+- OCR processing failures
+
+ALERT THRESHOLDS
+----------------
+Critical (Immediate Response):
+- System down (HTTP 503)
+- Database unreachable
+- Authentication system failure
+- AI service completely unavailable
+
+Warning (15-minute Response):
+- API response time > 2 seconds
+- Error rate > 5%
+- OCR failure rate > 20%
+- Memory usage > 90%
+
+RESPONSE PROCEDURES
+-------------------
+Critical Alert:
+1. Acknowledge alert within 2 minutes
+2. Start emergency procedures
+3. Update status page
+4. Notify affected customers
+5. Document resolution
+
+Warning Alert:
+1. Investigate within 15 minutes
+2. Implement temporary fix if possible
+3. Schedule permanent resolution
+4. Monitor for escalation
+
+================================================================
+🧰 EMERGENCY DRILL PROCEDURES
+================================================================
+
+FIRE DRILL CHECKLIST (Monthly)
+-------------------------------
+1. Intentionally disconnect database:
+   - Temporarily modify DATABASE_URL
+   - Follow "Database Connection Issues" recovery
+   - Time resolution process
+   - Document any improvements needed
+
+2. Authentication system test:
+   - Temporarily modify JWT_SECRET
+   - Follow authentication recovery steps
+   - Verify fallback procedures work
+   - Test user notification process
+
+3. AI service failure simulation:
+   - Temporarily disable OPENAI_API_KEY
+   - Test manual classification fallback
+   - Verify system remains functional
+   - Document degraded service procedures
+
+4. Complete system outage:
+   - Stop all workflows
+   - Follow full recovery procedures
+   - Test backup systems
+   - Verify data integrity post-recovery
+
+DRILL DOCUMENTATION
+-------------------
+Each drill should document:
+- Time to detect issue
+- Time to begin recovery
+- Time to full restoration
+- Any procedural improvements needed
+- Team response effectiveness
+
+POST-DRILL ACTIONS
+------------------
+1. Update procedures based on findings
+2. Train team on any new processes
+3. Schedule any system improvements
+4. Update emergency contact lists
+5. Review and update documentation
+
+================================================================
+📞 EMERGENCY CONTACTS
+================================================================
+
+PRIMARY SUPPORT
+----------------
+Development Team: Replit console messaging
+Database Issues: Neon PostgreSQL dashboard + support
+Platform Issues: Replit platform status page
+
+ESCALATION PROCEDURES
+---------------------
+1. Development team (0-15 minutes)
+2. Technical lead (15-30 minutes)
+3. Platform support (30+ minutes)
+4. Business stakeholders (1+ hour)
+
+================================================================
+END OF OPERATIONS HANDBOOK
+================================================================

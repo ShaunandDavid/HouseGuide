@@ -1,0 +1,253 @@
+🚨 HOUSEGUIDE EMERGENCY DRILL SYSTEM
+=====================================
+
+🎯 DRILL EXECUTION COMMANDS (Copy-Paste Ready)
+===============================================
+
+DATABASE CONNECTION FAILURE DRILL
+----------------------------------
+curl -X POST http://localhost:5000/api/admin/drill \
+  -H "Content-Type: application/json" \
+  -d '{"drillType": "database"}'
+
+Expected Response: 
+{
+  "drillType": "Database Connection Failure",
+  "success": true,
+  "detectedIn": 150,
+  "recoveredIn": 200,
+  "proceduresFollowed": [
+    "1. Modified DATABASE_URL to simulate failure",
+    "2. Database failure detected via health check", 
+    "3. Restored DATABASE_URL environment variable",
+    "4. Database connection restored successfully"
+  ]
+}
+
+AUTHENTICATION SYSTEM FAILURE DRILL
+------------------------------------
+curl -X POST http://localhost:5000/api/admin/drill \
+  -H "Content-Type: application/json" \
+  -d '{"drillType": "auth"}'
+
+Expected Response:
+{
+  "drillType": "Authentication System Failure",
+  "success": true,
+  "detectedIn": 100,
+  "recoveredIn": 50,
+  "proceduresFollowed": [
+    "1. Modified JWT_SECRET to simulate failure",
+    "2. Authentication failure detected on login attempt",
+    "3. Restored JWT_SECRET environment variable", 
+    "4. Authentication system restored"
+  ]
+}
+
+AI SERVICE FAILURE DRILL
+-------------------------
+curl -X POST http://localhost:5000/api/admin/drill \
+  -H "Content-Type: application/json" \
+  -d '{"drillType": "ai"}'
+
+Expected Response:
+{
+  "drillType": "AI Classification Service Failure", 
+  "success": true,
+  "detectedIn": 200,
+  "recoveredIn": 100,
+  "proceduresFollowed": [
+    "1. Modified OPENAI_API_KEY to simulate failure",
+    "2. AI service failure detected on classification request",
+    "3. Activated manual classification fallback",
+    "4. Restored OPENAI_API_KEY environment variable",
+    "5. AI service restored, manual fallback deactivated"
+  ]
+}
+
+COMPLETE SYSTEM OUTAGE DRILL
+-----------------------------
+curl -X POST http://localhost:5000/api/admin/drill \
+  -H "Content-Type: application/json" \
+  -d '{"drillType": "complete"}'
+
+Expected Response:
+{
+  "drillType": "Complete System Outage",
+  "success": true, 
+  "detectedIn": 300,
+  "recoveredIn": 500,
+  "proceduresFollowed": [
+    "1. Simulated complete environment failure",
+    "2. System outage detected via health checks",
+    "3. Restored all environment variables",
+    "4. All systems restored and healthy"
+  ]
+}
+
+📊 DRILL MONITORING COMMANDS
+=============================
+
+CHECK DRILL STATUS
+------------------
+curl http://localhost:5000/api/admin/drill/status
+
+Response:
+{
+  "activeDrill": null,
+  "isActive": false
+}
+
+GET DRILL HISTORY & ANALYTICS
+------------------------------
+curl http://localhost:5000/api/admin/drill/history
+
+Response:
+{
+  "history": [
+    {
+      "drillType": "Database Connection Failure",
+      "timestamp": "2025-09-02T20:30:00.000Z",
+      "success": true,
+      "detectedIn": 150,
+      "recoveredIn": 200
+    }
+  ],
+  "analytics": {
+    "totalDrills": 4,
+    "successRate": 100,
+    "averageDetectionTime": 187,
+    "averageRecoveryTime": 212,
+    "drillTypesCovered": [
+      "Database Connection Failure",
+      "Authentication System Failure", 
+      "AI Classification Service Failure",
+      "Complete System Outage"
+    ],
+    "lastDrill": "2025-09-02T20:30:00.000Z"
+  }
+}
+
+🎯 DRILL EVALUATION CRITERIA
+=============================
+
+SUCCESS INDICATORS
+-------------------
+✅ Drill completes without errors
+✅ Detection time < 500ms
+✅ Recovery time < 1000ms  
+✅ All procedures followed correctly
+✅ System fully operational after recovery
+
+FAILURE INDICATORS
+-------------------
+❌ Drill execution throws errors
+❌ Detection time > 2000ms
+❌ Recovery time > 5000ms
+❌ Procedures skipped or failed
+❌ System partially operational after recovery
+
+📝 DRILL SCHEDULE RECOMMENDATIONS
+==================================
+
+WEEKLY DRILLS
+-------------
+Monday: Database connection failure
+Wednesday: Authentication system failure
+Friday: AI service failure
+
+MONTHLY DRILLS
+--------------
+1st Monday: Complete system outage
+3rd Friday: All drills in sequence
+
+QUARTERLY DRILLS
+----------------
+Full disaster recovery with external monitoring
+Performance under load during outage
+Staff response time evaluation
+
+🧰 MANUAL VERIFICATION STEPS
+==============================
+
+After Each Drill:
+1. Verify system health: curl http://localhost:5000/api/health
+2. Test authentication: Try login with demo credentials
+3. Test AI functionality: Upload document for classification
+4. Check all tracker saves: Create goal, chore, incident, etc.
+5. Generate weekly report: Verify AI report generation works
+
+⚠️ DRILL SAFETY NOTES
+======================
+
+BEFORE RUNNING DRILLS:
+- Ensure no real users are actively using the system
+- Backup current environment variables
+- Have recovery procedures documented
+- Notify team members drill is starting
+
+DURING DRILLS:
+- Monitor system logs for actual errors
+- Time each phase of detection and recovery
+- Document any unexpected behaviors
+- Stop drill immediately if real issues detected
+
+AFTER DRILLS:
+- Verify complete system recovery
+- Document lessons learned
+- Update procedures based on findings
+- Schedule any necessary improvements
+
+🚨 EMERGENCY ABORT PROCEDURE
+=============================
+
+If drill causes real system issues:
+
+1. IMMEDIATE ABORT:
+   curl -X POST http://localhost:5000/api/admin/drill/abort
+
+2. MANUAL ENVIRONMENT RESTORE:
+   - Check all environment variables are correct
+   - Restart application workflow
+   - Run full health check
+
+3. VERIFY RECOVERY:
+   - Test all critical functions
+   - Check database connectivity 
+   - Verify AI services operational
+   - Confirm user authentication working
+
+⏰ EXPECTED DRILL TIMINGS
+=========================
+
+Database Failure:
+- Detection: 100-300ms
+- Recovery: 200-500ms
+- Total: < 1 second
+
+Authentication Failure:
+- Detection: 50-200ms
+- Recovery: 50-200ms  
+- Total: < 500ms
+
+AI Service Failure:
+- Detection: 200-500ms
+- Recovery: 100-300ms
+- Total: < 1 second
+
+Complete Outage:
+- Detection: 300-1000ms
+- Recovery: 500-2000ms
+- Total: < 3 seconds
+
+📞 DRILL SUPPORT CONTACTS
+==========================
+
+Technical Issues: Development team via Replit console
+Drill Questions: Reference Operations Handbook
+System Recovery: Follow Emergency Procedures guide
+Performance Issues: Check monitoring dashboard
+
+=====================================
+END OF EMERGENCY DRILL COMMANDS
+=====================================
