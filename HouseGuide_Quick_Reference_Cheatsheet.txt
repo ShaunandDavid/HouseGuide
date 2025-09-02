@@ -1,0 +1,101 @@
+🏠 HOUSEGUIDE - QUICK REFERENCE CHEATSHEET (1-PAGE)
+================================================================
+
+🚨 EMERGENCY RESTART PROCEDURES
+--------------------------------
+1. Replit Console → "Start application" workflow → Click restart
+2. Check logs for errors: Look at workflow console output
+3. Verify health: curl http://localhost:5000/api/health
+4. Test login: Level7mediaofficial@gmail.com / password123
+
+⚡ DEV COMMANDS (Copy-Paste Ready)
+----------------------------------
+# Start development
+npm run dev
+
+# Database sync (safe)
+npm run db:push
+
+# Database force sync (if conflicts)
+npm run db:push --force
+
+# Build for production
+npm run build
+
+# Start production
+npm start
+
+# Type check
+npm run check
+
+🔍 HEALTH CHECKS (30-Second Status)
+-----------------------------------
+# API Health
+curl http://localhost:5000/api/health
+
+# Database Connection
+echo $DATABASE_URL
+
+# Environment Check
+curl -H "Content-Type: application/json" http://localhost:5000/api/me
+
+# Test Authentication
+curl -X POST http://localhost:5000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"Level7mediaofficial@gmail.com","password":"password123"}'
+
+🛠️ COMMON FIXES
+-----------------
+❌ Database Down → npm run db:push --force
+❌ Auth Failing → Check JWT_SECRET environment variable
+❌ OCR Not Working → Check image size/format, fallback to manual entry
+❌ AI Classification Failed → Verify OPENAI_API_KEY, use manual categorization
+❌ Can't Save Data → Check specific tracker API endpoints (see Ops Handbook)
+
+📊 CRITICAL ENDPOINTS (Test These First)
+-----------------------------------------
+GET  /api/health                           # System status
+POST /api/login                            # Authentication
+GET  /api/residents                        # Core data access
+POST /api/reports/weekly/generate          # AI functionality
+GET  /api/goals/by-resident/:id           # Tracker functionality
+
+🔑 ENVIRONMENT SECRETS (Must Be Set)
+-------------------------------------
+✅ DATABASE_URL (PostgreSQL connection)
+✅ OPENAI_API_KEY (AI classification)
+✅ SENDGRID_API_KEY (Email service)
+✅ JWT_SECRET (Authentication)
+
+📱 PRODUCTION STATUS CHECK (5-Minute Verification)
+---------------------------------------------------
+1. Login works → Test credentials above
+2. Create resident → POST /api/residents
+3. Add goal → POST /api/goals (any tracker)
+4. Generate report → POST /api/reports/weekly/generate
+5. OCR scan → Upload document via UI
+6. Mobile responsive → Test on phone/tablet
+
+⚠️ WHEN SYSTEM IS DOWN (Priority Order)
+----------------------------------------
+1. Restart Replit workflow
+2. Check DATABASE_URL is set
+3. Verify all 4 environment secrets exist
+4. Check Neon database dashboard for outages
+5. Review server logs in console for specific errors
+6. Test individual API endpoints to isolate issue
+
+🎯 DAILY OPERATIONS CHECKLIST
+------------------------------
+□ System health check (curl api/health)
+□ Authentication test (login/logout)
+□ Database connection verified
+□ AI classification working
+□ Weekly reports generating
+□ Mobile UI responsive
+
+================================================================
+CONTACT: Development team via Replit console
+DATABASE: Neon PostgreSQL dashboard
+BACKUP: Use "npm run db:push" for schema recovery
+================================================================
