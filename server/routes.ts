@@ -81,6 +81,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: 'Drill aborted - manual intervention completed' });
   });
 
+  // Compliance binder download endpoint
+  app.get('/api/compliance-binder', (req, res) => {
+    const filePath = join(process.cwd(), 'client/public/HIPAA_Compliance_Binder_1756850255321.zip');
+    res.download(filePath, 'HouseGuide_HIPAA_Compliance_Binder.zip', (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(404).json({ error: 'File not found' });
+      }
+    });
+  });
+
   // Debug endpoint to test cookies
   app.get("/api/whoami", requireAuth, (req: any, res) => {
     res.json({ ok: true, user: req.guide?.email });

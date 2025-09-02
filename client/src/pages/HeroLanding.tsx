@@ -81,8 +81,7 @@ export default function HeroLanding() {
                       No credit card required • 30-day free trial
                     </p>
                     <a 
-                      href="/HIPAA_Compliance_Binder_1756850255321.zip" 
-                      download
+                      href="/api/compliance-binder" 
                       className="flex items-center space-x-2 text-blue-200 hover:text-white transition-colors text-sm group"
                     >
                       <Download className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
