@@ -120,7 +120,7 @@ export default function ChoreTracker() {
           choreName: formData.choreName,
           notes: formData.notes,
           status: formData.status,
-          assignedDate: formData.assignedDate || undefined,
+          assignedDate: formData.assignedDate || '',
           dueDate: formData.dueDate || undefined
         });
         setChores(prev => prev.map(chore => chore.id === editingChore.id ? updatedChore : chore));
@@ -137,7 +137,7 @@ export default function ChoreTracker() {
           choreName: formData.choreName,
           notes: formData.notes,
           status: formData.status,
-          assignedDate: formData.assignedDate || undefined,
+          assignedDate: formData.assignedDate || '',
           dueDate: formData.dueDate || undefined
         });
         setChores(prev => [...prev, newChore]);
