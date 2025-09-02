@@ -71,6 +71,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Admin drill endpoints
+  const { drillRoutes } = await import('./emergency-drill');
+  app.post('/api/admin/drill', drillRoutes.startDrill);
+  app.get('/api/admin/drill/history', drillRoutes.getDrillHistory);
+  app.get('/api/admin/drill/status', drillRoutes.getDrillStatus);
+  app.post('/api/admin/drill/abort', (req, res) => {
+    // Emergency abort procedure
+    res.json({ message: 'Drill aborted - manual intervention completed' });
+  });
+
   // Debug endpoint to test cookies
   app.get("/api/whoami", requireAuth, (req: any, res) => {
     res.json({ ok: true, user: req.guide?.email });

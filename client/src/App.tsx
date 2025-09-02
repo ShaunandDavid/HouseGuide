@@ -18,6 +18,7 @@ import AccomplishmentTracker from "@/pages/AccomplishmentTracker";
 import IncidentTracker from "@/pages/IncidentTracker";
 import MeetingTracker from "@/pages/MeetingTracker";
 import ProgramFeesTracker from "@/pages/ProgramFeesTracker";
+import AdminDrillDashboard from "@/pages/AdminDrillDashboard";
 import NotFound from "@/pages/not-found";
 
 // Register service worker for PWA
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/resident/:id/reports" component={ResidentDashboard} />
       <Route path="/resident/:id/pictures" component={ResidentDashboard} />
       <Route path="/resident/:id/notes" component={ResidentDashboard} />
+      <Route path="/admin/drill" component={AdminDrillDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

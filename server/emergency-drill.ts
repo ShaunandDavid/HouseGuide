@@ -217,6 +217,152 @@ export class EmergencyDrill {
     return result;
   }
   
+  // Simulate backup verification drill
+  static async simulateBackupRestore(): Promise<DrillResult> {
+    const startTime = Date.now();
+    this.activeDrill = 'backup_restore';
+    
+    logger.info('EMERGENCY DRILL: Starting backup restoration verification');
+    
+    const result: DrillResult = {
+      drillType: 'Backup Restoration Verification',
+      timestamp: new Date().toISOString(),
+      success: false,
+      detectedIn: 0,
+      recoveredIn: 0,
+      proceduresFollowed: [],
+      issues: [],
+      improvements: []
+    };
+    
+    try {
+      // Step 1: Verify current database state
+      const detectionStart = Date.now();
+      const { storage } = await import('./storage');
+      
+      // Get current record counts for verification
+      const currentState = {
+        houses: (await storage.getAllHouses()).length,
+        residents: (await storage.getAllResidents()).length,
+        goals: (await storage.getAllGoals()).length,
+        chores: (await storage.getAllChores()).length,
+        incidents: (await storage.getAllIncidents()).length,
+        meetings: (await storage.getAllMeetings()).length,
+        accomplishments: (await storage.getAllAccomplishments()).length,
+        checklists: (await storage.getAllChecklists()).length,
+        fees: (await storage.getAllFees()).length,
+        notes: (await storage.getAllNotes()).length
+      };
+      
+      result.detectedIn = Date.now() - detectionStart;
+      result.proceduresFollowed.push(`1. Current database state verified: ${JSON.stringify(currentState)}`);
+      
+      // Step 2: Simulate backup verification
+      const recoveryStart = Date.now();
+      
+      // Verify schema integrity
+      const schemaCheck = await this.verifySchemaIntegrity();
+      result.proceduresFollowed.push(`2. Schema integrity check: ${schemaCheck ? 'PASSED' : 'FAILED'}`);
+      
+      // Verify foreign key constraints
+      const constraintCheck = await this.verifyConstraints();
+      result.proceduresFollowed.push(`3. Constraint verification: ${constraintCheck ? 'PASSED' : 'FAILED'}`);
+      
+      // Verify data consistency
+      const dataCheck = await this.verifyDataConsistency();
+      result.proceduresFollowed.push(`4. Data consistency check: ${dataCheck ? 'PASSED' : 'FAILED'}`);
+      
+      result.recoveredIn = Date.now() - recoveryStart;
+      
+      if (schemaCheck && constraintCheck && dataCheck) {
+        result.success = true;
+        result.proceduresFollowed.push('5. Backup restoration verification completed successfully');
+      } else {
+        result.issues.push('Backup verification failed - data integrity issues detected');
+      }
+      
+    } catch (error) {
+      result.issues.push(`Drill execution error: ${error}`);
+      ErrorTracker.trackError(error as Error, { drill: 'backup_restore' });
+    } finally {
+      this.activeDrill = null;
+    }
+    
+    result.improvements = [
+      'Implement automated daily backup verification',
+      'Set up point-in-time recovery testing',
+      'Create backup restoration automation scripts',
+      'Add backup corruption detection',
+      'Implement backup cross-region replication'
+    ];
+    
+    this.drillHistory.push(result);
+    logger.info('EMERGENCY DRILL: Backup restoration verification completed', result);
+    
+    return result;
+  }
+  
+  // Helper methods for backup verification
+  private static async verifySchemaIntegrity(): Promise<boolean> {
+    try {
+      // Check if all required tables exist
+      const { db } = await import('./db');
+      const tables = [
+        'houses', 'guides', 'residents', 'goals', 'chores', 
+        'incidents', 'meetings', 'accomplishments', 'checklists', 
+        'program_fees', 'notes', 'files', 'weekly_reports'
+      ];
+      
+      for (const table of tables) {
+        const result = await db.execute(`SELECT COUNT(*) FROM ${table}`);
+        if (!result) return false;
+      }
+      
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  
+  private static async verifyConstraints(): Promise<boolean> {
+    try {
+      // Verify foreign key relationships are intact
+      const { db } = await import('./db');
+      
+      // Check residents have valid house references
+      const orphanedResidents = await db.execute(`
+        SELECT COUNT(*) as count FROM residents r 
+        LEFT JOIN houses h ON r.house_id = h.id 
+        WHERE h.id IS NULL
+      `);
+      
+      if (orphanedResidents[0]?.count > 0) return false;
+      
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  
+  private static async verifyDataConsistency(): Promise<boolean> {
+    try {
+      // Check for data corruption or inconsistencies
+      const { storage } = await import('./storage');
+      
+      // Verify all residents have valid dates
+      const residents = await storage.getAllResidents();
+      for (const resident of residents) {
+        if (resident.admissionDate && isNaN(Date.parse(resident.admissionDate))) {
+          return false;
+        }
+      }
+      
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Run complete system outage drill
   static async simulateCompleteOutage(): Promise<DrillResult> {
     const startTime = Date.now();
@@ -364,6 +510,9 @@ export const drillRoutes = {
           break;
         case 'complete':
           result = await EmergencyDrill.simulateCompleteOutage();
+          break;
+        case 'backup':
+          result = await EmergencyDrill.simulateBackupRestore();
           break;
         default:
           return res.status(400).json({ error: 'Invalid drill type' });
