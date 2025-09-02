@@ -19,6 +19,7 @@ import IncidentTracker from "@/pages/IncidentTracker";
 import MeetingTracker from "@/pages/MeetingTracker";
 import ProgramFeesTracker from "@/pages/ProgramFeesTracker";
 import AdminDrillDashboard from "@/pages/AdminDrillDashboard";
+import HeroLanding from "@/pages/HeroLanding";
 import NotFound from "@/pages/not-found";
 
 // Register service worker for PWA
@@ -51,7 +52,8 @@ if ('serviceWorker' in navigator) {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Login} />
+      <Route path="/" component={HeroLanding} />
+      <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/dashboard" component={House} />
