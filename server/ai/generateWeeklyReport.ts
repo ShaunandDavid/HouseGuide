@@ -167,6 +167,36 @@ async function classifyWithLLM(entries: Entry[]): Promise<Classification> {
       text: "Dropped off applications and interviewed at a warehouse.",
       expected: "WorkSchool",
     },
+    {
+      id: "ex6",
+      type: "note",
+      text: "Works at Target",
+      expected: "WorkSchool",
+    },
+    {
+      id: "ex7",
+      type: "note",
+      text: "Self reported job at CIPA USA",
+      expected: "WorkSchool",
+    },
+    {
+      id: "ex8",
+      type: "note",
+      text: "Working on finding a job",
+      expected: "WorkSchool",
+    },
+    {
+      id: "ex9",
+      type: "note",
+      text: "Works 30 hours at Culvers; picked up an extra shift this week.",
+      expected: "WorkSchool",
+    },
+    {
+      id: "ex10",
+      type: "incident",
+      text: "Got frustrated about work schedule conflicts with house meetings",
+      expected: "DemeanorParticipation",
+    },
   ];
 
   const response = await client.chat.completions.create({
@@ -198,6 +228,80 @@ async function classifyWithLLM(entries: Entry[]): Promise<Classification> {
   return parsed.data;
 }
 
+/** ---------------- Employment Corrector ---------------- **/
+
+function isEmploymentContent(text: string): boolean {
+  // Strong employment indicators
+  const employmentPatterns = /\b(works?\s+at|employed\s+at|job\s+at|position\s+at|hired\s+at|self[\s-]?reported\s+job|finding\s+a?\s+job|looking\s+for\s+(work|job|employment)|applied\s+for|interview\s+at|shift\s+at|clocked\s+in|resume|w[-\s]?2|paycheck)\b/i;
+  
+  // Company names that are definitely employment
+  const companyNames = /\b(target|culver'?s|cipa\s*usa|walmart|amazon|mcdonald'?s|starbucks|home\s*depot)\b/i;
+  
+  return employmentPatterns.test(text) || companyNames.test(text);
+}
+
+function isEmotionalContext(text: string): boolean {
+  // Check if primary context is emotional/behavioral
+  const emotionalPatterns = /\b(angry|frustrated|upset|argued|conflict|anxious|agitated|depressed|happy|excited|stressed|overwhelmed|nervous|calm|aggressive|withdrawn)\s+(about|regarding|with|over|due\s+to)?\s*(work|job|employment)?/i;
+  return emotionalPatterns.test(text);
+}
+
+function correctEmploymentLeak(c: Classification): Classification {
+  const moved: typeof c.sections.WorkSchool.items = [];
+  let correctionsMade = 0;
+
+  // Scan Demeanor for misfiled employment notes
+  c.sections.DemeanorParticipation.items = c.sections.DemeanorParticipation.items.filter((it) => {
+    // If it's clearly employment content AND not primarily emotional
+    if (isEmploymentContent(it.text) && !isEmotionalContext(it.text)) {
+      // Only move if confidence is less than 0.9 (not super confident)
+      if (it.confidence < 0.9) {
+        moved.push({ 
+          ...it, 
+          reason: `Employment content corrected from Demeanor to Work/School`, 
+          confidence: Math.max(it.confidence, 0.85) 
+        });
+        correctionsMade++;
+        console.log(`[CORRECTOR] Moving to Work/School: "${it.text}"`);
+        return false; // remove from Demeanor
+      }
+    }
+    return true; // keep in Demeanor
+  });
+
+  // Also check other sections for misplaced employment content
+  const sectionsToCheck = ['SponsorMentor', 'ChoresCompliance', 'ProfessionalHelpAppointments'] as const;
+  
+  for (const sectionName of sectionsToCheck) {
+    c.sections[sectionName].items = c.sections[sectionName].items.filter((it) => {
+      if (isEmploymentContent(it.text) && !isEmotionalContext(it.text) && it.confidence < 0.85) {
+        moved.push({ 
+          ...it, 
+          reason: `Employment content corrected from ${sectionName} to Work/School`, 
+          confidence: Math.max(it.confidence, 0.85) 
+        });
+        correctionsMade++;
+        console.log(`[CORRECTOR] Moving from ${sectionName} to Work/School: "${it.text}"`);
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // Add moved items to Work/School
+  c.sections.WorkSchool.items.push(...moved);
+  
+  if (moved.length) {
+    c.sections.WorkSchool.summary = c.sections.WorkSchool.summary 
+      ? `${c.sections.WorkSchool.summary} (${moved.length} employment items corrected from other sections)`
+      : `Employment activity recorded. ${moved.length} employment-related item(s) identified.`;
+  }
+
+  console.log(`[CORRECTOR] Total corrections made: ${correctionsMade}`);
+  
+  return c;
+}
+
 /** ---------------- Public Orchestrator ---------------- **/
 
 export async function generateWeeklyReport(
@@ -205,13 +309,22 @@ export async function generateWeeklyReport(
   weekIsoRange: { start: string; end: string },
   entries: Entry[],
 ) {
+  console.info("[REPORT] Starting weekly report generation");
+  console.info("[REPORT] Model:", process.env.OPENAI_MODEL ?? "gpt-3.5-turbo");
+  console.info("[REPORT] Total entries:", entries.length);
+  
   const sanitized = redactEntries(entries);
 
   // Try LLM first
   let classification: Classification | null = null;
+  let llmUsed = false;
+  
   try {
     classification = await classifyWithLLM(sanitized);
+    llmUsed = true;
+    console.info("[REPORT] LLM classification successful");
   } catch (e) {
+    console.warn("[REPORT] LLM classification failed, using rule-based fallback:", e);
     // Fallback to deterministic rules
     const buckets: Record<z.infer<typeof SectionId>, z.infer<typeof SectionBucket>["items"]> = {
       SponsorMentor: [],
@@ -260,6 +373,20 @@ export async function generateWeeklyReport(
         "Automated rule-based fallback enabled due to AI unavailability. Entries routed by deterministic heuristics.",
     };
   }
+
+  // Apply employment corrector to fix any miscategorized work content
+  classification = correctEmploymentLeak(classification);
+  
+  // Log final distribution
+  console.info("[REPORT] Final categorization counts:", {
+    sponsor: classification.sections.SponsorMentor.items.length,
+    work: classification.sections.WorkSchool.items.length,
+    chores: classification.sections.ChoresCompliance.items.length,
+    demeanor: classification.sections.DemeanorParticipation.items.length,
+    professional: classification.sections.ProfessionalHelpAppointments.items.length,
+    uncategorized: classification.uncategorized.length,
+    llmUsed: llmUsed
+  });
 
   // Compose a clean, court/insurer-friendly Markdown
   const md = buildMarkdownReport(weekIsoRange, classification);

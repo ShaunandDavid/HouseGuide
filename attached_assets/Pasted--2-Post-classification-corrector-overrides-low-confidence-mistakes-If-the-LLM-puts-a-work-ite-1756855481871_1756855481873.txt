@@ -1,0 +1,81 @@
+
+2) Post-classification “corrector” (overrides low-confidence mistakes)
+If the LLM puts a work item in Demeanor with meh confidence, force-route it to WorkSchool.
+
+ts
+Copy code
+function employmentCue(text: string): boolean {
+  return /\b(job|jobs|employ(ed|ment)|hire(d|s|ing)?|work(ed|er|ers|ing|s)?|shift|clock(ed|ing)?|resume|interview|onboard|paycheck|w[-\s]?2|cipa\s*usa|target|culver'?s)\b/i.test(text);
+}
+
+function correctEmploymentLeak(c: Classification): Classification {
+  const moved: typeof c.sections.WorkSchool.items = [];
+
+  // scan Demeanor for misfiled employment notes
+  c.sections.DemeanorParticipation.items = c.sections.DemeanorParticipation.items.filter((it) => {
+    if (employmentCue(it.text) && it.confidence < 0.9) {
+      moved.push({ ...it, reason: `${it.reason} → corrected to Work/School`, confidence: Math.max(it.confidence, 0.8) });
+      return false; // remove from Demeanor
+    }
+    return true;
+  });
+
+  // also scan Uncategorized just in case
+  const stillUncat: string[] = [];
+  for (const id of c.uncategorized) {
+    // you'd need the original text; if you keep a map<id,text>, check it here and push to moved
+    stillUncat.push(id);
+  }
+  c.uncategorized = stillUncat;
+
+  c.sections.WorkSchool.items.push(...moved);
+  if (moved.length) {
+    c.sections.WorkSchool.summary = (c.sections.WorkSchool.summary || "")
+      + ` Corrected ${moved.length} employment-related item(s) from other sections.`;
+  }
+  return c;
+}
+…and call it right before composing Markdown:
+
+ts
+Copy code
+classification = correctEmploymentLeak(classification);
+const md = buildMarkdownReport(weekIsoRange, classification);
+3) Make sure the new path is actually running
+Quick diagnostics so you can see what’s happening in logs:
+
+ts
+Copy code
+console.info("[REPORT] model=", MODEL);
+console.info("[REPORT] entries=", entries.length);
+console.info("[REPORT] llm_used=", !!classification && !classification.overallSummary?.includes("rule-based"));
+console.info("[REPORT] counts", {
+  sponsor: classification.sections.SponsorMentor.items.length,
+  work: classification.sections.WorkSchool.items.length,
+  chores: classification.sections.ChoresCompliance.items.length,
+  demeanor: classification.sections.DemeanorParticipation.items.length,
+  pro: classification.sections.ProfessionalHelpAppointments.items.length,
+});
+Also confirm your endpoint is using the new orchestrator (not the old templater) and that OPENAI_MODEL is set to your best model (e.g., gpt-5 or gpt-4o).
+
+4) Few-shot nudge (makes the LLM stop leaking to Demeanor)
+Add this extra example to the examples array:
+
+ts
+Copy code
+{
+  id: "ex6",
+  type: "note",
+  text: "Works 30 hours at Target; picked up an extra shift this week.",
+  expected: "WorkSchool",
+}
+5) Quick test cases (paste in your admin QA panel)
+“works at Target” → Work/School
+
+“Self reported job at CIPA USA” → Work/School
+
+“Working on finding a job” → Work/School
+
+“Seemed agitated today” → Demeanor/Participation
+
+“Therapy appointment completed” → Professional Help/Appointments
