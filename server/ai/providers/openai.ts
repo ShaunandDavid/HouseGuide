@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { AIProvider, WeeklyReportData } from '../index';
+import { generateWeeklyReport as semanticGenerateWeeklyReport, type Entry } from '../generateWeeklyReport';
 
 export class OpenAIProvider implements AIProvider {
   private openai: OpenAI | null = null;
@@ -20,6 +21,128 @@ export class OpenAIProvider implements AIProvider {
       throw new Error('OpenAI not configured - missing OPENAI_API_KEY');
     }
 
+    // Convert data to Entry format for semantic classification
+    const entries: Entry[] = [];
+    
+    // Add goals
+    data.data.goals.forEach(goal => {
+      entries.push({
+        id: goal.id,
+        type: 'goal',
+        text: `${goal.title}: ${goal.description || ''}`.trim(),
+        createdAt: goal.created || new Date().toISOString(),
+        tags: [goal.status, goal.priority].filter(Boolean)
+      });
+    });
+    
+    // Add chores
+    data.data.chores.forEach(chore => {
+      entries.push({
+        id: chore.id,
+        type: 'chore',
+        text: `${chore.choreName}: ${chore.notes || ''}`.trim(),
+        createdAt: chore.created || new Date().toISOString(),
+        tags: [chore.status].filter(Boolean)
+      });
+    });
+    
+    // Add meetings
+    data.data.meetings.forEach(meeting => {
+      entries.push({
+        id: meeting.id,
+        type: 'meeting',
+        text: `${meeting.meetingType}: ${meeting.notes || ''}`.trim(),
+        createdAt: meeting.created || new Date().toISOString(),
+        tags: [meeting.meetingType].filter(Boolean)
+      });
+    });
+    
+    // Add incidents
+    data.data.incidents.forEach(incident => {
+      entries.push({
+        id: incident.id,
+        type: 'incident',
+        text: `${incident.incidentType} (${incident.severity}): ${incident.description}`,
+        createdAt: incident.created || new Date().toISOString(),
+        tags: [incident.incidentType, incident.severity].filter(Boolean)
+      });
+    });
+    
+    // Add notes
+    data.data.notes.forEach(note => {
+      entries.push({
+        id: note.id,
+        type: 'note',
+        text: note.text,
+        createdAt: note.created || new Date().toISOString(),
+        tags: [note.source].filter(Boolean)
+      });
+    });
+    
+    // Add accomplishments
+    data.data.accomplishments.forEach(accomplishment => {
+      entries.push({
+        id: accomplishment.id,
+        type: 'note', // Map to note type for classification
+        text: `Accomplishment - ${accomplishment.title}: ${accomplishment.description || ''}`.trim(),
+        createdAt: accomplishment.created || new Date().toISOString(),
+        tags: [accomplishment.category].filter(Boolean)
+      });
+    });
+    
+    try {
+      // Use semantic classification
+      const result = await semanticGenerateWeeklyReport(
+        data.resident.id,
+        {
+          start: data.period.weekStart,
+          end: data.period.weekEnd
+        },
+        entries
+      );
+      
+      // Convert classification to traditional report format
+      const sections = result.classification.sections;
+      
+      const sponsorInfo = sections.SponsorMentor.items.length > 0 
+        ? sections.SponsorMentor.summary + '\n' + sections.SponsorMentor.items.map(i => `• ${i.text}`).join('\n')
+        : 'No updates this week';
+        
+      const workInfo = sections.WorkSchool.items.length > 0
+        ? sections.WorkSchool.summary + '\n' + sections.WorkSchool.items.map(i => `• ${i.text}`).join('\n')
+        : 'No updates this week';
+        
+      const choresInfo = sections.ChoresCompliance.items.length > 0
+        ? sections.ChoresCompliance.summary + '\n' + sections.ChoresCompliance.items.map(i => `• ${i.text}`).join('\n')
+        : 'No updates this week';
+        
+      const demeanorInfo = sections.DemeanorParticipation.items.length > 0
+        ? sections.DemeanorParticipation.summary + '\n' + sections.DemeanorParticipation.items.map(i => `• ${i.text}`).join('\n')
+        : 'No incidents or behavioral notes this week';
+        
+      const professionalInfo = sections.ProfessionalHelpAppointments.items.length > 0
+        ? sections.ProfessionalHelpAppointments.summary + '\n' + sections.ProfessionalHelpAppointments.items.map(i => `• ${i.text}`).join('\n')
+        : 'No updates this week';
+      
+      const report = `Resident: ${data.resident.firstName} ${data.resident.lastInitial}.  Week of: ${data.period.weekStart}
+
+__Sponsor/Mentor:__ ${sponsorInfo}
+
+__Work/School:__ ${workInfo}
+
+__Chores/Compliance:__ ${choresInfo}
+
+__Demeanor / Participation:__ ${demeanorInfo}
+
+__Professional Help / Appointments:__ ${professionalInfo}`;
+      
+      return report;
+    } catch (semanticError) {
+      console.log('Semantic classification failed, using fallback AI generation:', semanticError);
+      // Fallback to original AI generation
+    }
+
+    // Fallback AI generation
     const systemPrompt = `You are a professional residential care facility staff member writing weekly progress reports. 
 
 STRICT REQUIREMENTS:
