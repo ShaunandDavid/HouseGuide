@@ -1360,37 +1360,78 @@ __Professional Help / Appointments:__ ${professionalInfo}`;
       // Collect comprehensive data for all residents
       const residentReports = await Promise.all(
         activeResidents.map(async (resident) => {
-          const [goals, chores, accomplishments, incidents, meetings, programFees, notes] = await Promise.all([
+          const [goals, chores, accomplishments, incidents, meetings, programFees, notes, checklist] = await Promise.all([
             storage.getGoalsByResident(resident.id),
             storage.getChoresByResident(resident.id),
             storage.getAccomplishmentsByResident(resident.id),
             storage.getIncidentsByResident(resident.id),
             storage.getMeetingsByResident(resident.id),
             storage.getProgramFeesByResident(resident.id),
-            storage.getNotesByResident(resident.id)
+            storage.getNotesByResident(resident.id),
+            storage.getChecklistByResident(resident.id)
           ]);
 
           const weekData = {
-            goals: filterByWeek(goals, 'created'),
-            chores: filterByWeek(chores, 'assignedDate'),
-            accomplishments: filterByWeek(accomplishments, 'dateAchieved'),
-            incidents: filterByWeek(incidents, 'dateOccurred'),
-            meetings: filterByWeek(meetings, 'dateAttended'),
-            programFees: filterByWeek(programFees, 'dueDate'),
-            notes: filterByWeek(notes, 'created')
+            resident: {
+              id: resident.id,
+              firstName: resident.firstName,
+              lastInitial: resident.lastInitial
+            },
+            house: {
+              id: house.id,
+              name: house.name
+            },
+            period: {
+              weekStart,
+              weekEnd
+            },
+            data: {
+              goals: filterByWeek(goals, 'created'),
+              chores: filterByWeek(chores, 'assignedDate'),
+              accomplishments: filterByWeek(accomplishments, 'dateAchieved'),
+              incidents: filterByWeek(incidents, 'dateOccurred'),
+              meetings: filterByWeek(meetings, 'dateAttended'),
+              programFees: filterByWeek(programFees, 'dueDate'),
+              notes: filterByWeek(notes, 'created'),
+              checklist: checklist
+            }
           };
 
-          // Generate individual report using template format
-          const sponsorInfo = weekData.meetings.length > 0 ? weekData.meetings.map(m => m.meetingType).join(', ') : 'No updates this week';
-          const workInfo = weekData.goals.length > 0 ? weekData.goals.map(g => `${g.title} (${g.status})`).join(', ') : 'No updates this week';
-          const choresInfo = weekData.chores.length > 0 ? weekData.chores.map(c => `${c.choreName} (${c.status})`).join(', ') : 'No updates this week';
-          const demeanorInfo = weekData.incidents.length > 0 ? weekData.incidents.map(i => `${i.incidentType} incident (${i.severity})`).join(', ') : 'No incidents this week';
-          const professionalInfo = weekData.accomplishments.length > 0 ? weekData.accomplishments.map(a => a.title).join(', ') : 'No updates this week';
-          
-          return {
-            resident,
-            weekData,
-            report: `Resident: ${resident.firstName} ${resident.lastInitial}.  Week of: ${weekStart}
+          // Try AI generation for each resident
+          let report;
+          try {
+            // Lazy load AI service to avoid startup errors
+            const { aiService } = await import('./ai/index');
+            
+            // Load the report template
+            const { dirname } = await import('path');
+            const { fileURLToPath } = await import('url');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = dirname(__filename);
+            
+            const templatePath = process.env.WEEKLY_REPORT_TEMPLATE_PATH || join(__dirname, 'templates', 'weeklyReport.md');
+            const template = readFileSync(templatePath, 'utf-8');
+
+            // Generate report with AI
+            report = await aiService.generateWeeklyReport(weekData, template);
+          } catch (aiError) {
+            console.log('AI generation failed for resident, using template fallback:', aiError);
+            // Fallback to basic template
+            const sponsorInfo = weekData.data.meetings.length > 0 ? weekData.data.meetings.map(m => m.meetingType).join(', ') : 'No updates this week';
+            const workInfo = weekData.data.goals.length > 0 ? weekData.data.goals.map(g => `${g.title} (${g.status})`).join(', ') : 'No updates this week';
+            const choresInfo = weekData.data.chores.length > 0 ? weekData.data.chores.map(c => `${c.choreName} (${c.status})`).join(', ') : 'No updates this week';
+            // Include both incidents AND notes for demeanor
+            const demeanorItems = [];
+            if (weekData.data.incidents.length > 0) {
+              demeanorItems.push(...weekData.data.incidents.map(i => `${i.incidentType} incident (${i.severity})`));
+            }
+            if (weekData.data.notes.length > 0) {
+              demeanorItems.push(...weekData.data.notes.map(n => n.text.substring(0, 100) + (n.text.length > 100 ? '...' : '')));
+            }
+            const demeanorInfo = demeanorItems.length > 0 ? demeanorItems.join(', ') : 'No incidents or behavioral notes this week';
+            const professionalInfo = weekData.data.accomplishments.length > 0 ? weekData.data.accomplishments.map(a => a.title).join(', ') : 'No updates this week';
+            
+            report = `Resident: ${resident.firstName} ${resident.lastInitial}.  Week of: ${weekStart}
 
 __Sponsor/Mentor:__ ${sponsorInfo}
 
@@ -1400,23 +1441,107 @@ __Chores/Compliance:__ ${choresInfo}
 
 __Demeanor / Participation:__ ${demeanorInfo}
 
-__Professional Help / Appointments:__ ${professionalInfo}`
+__Professional Help / Appointments:__ ${professionalInfo}`;
+          }
+          
+          return {
+            resident,
+            weekData: weekData.data,
+            report
           };
         })
       );
 
-      // Generate comprehensive house summary
+      // Generate comprehensive house summary with AI
       const totalResidents = activeResidents.length;
       const totalIncidents = residentReports.reduce((sum, r) => sum + r.weekData.incidents.length, 0);
       const totalMeetings = residentReports.reduce((sum, r) => sum + r.weekData.meetings.length, 0);
       const totalAccomplishments = residentReports.reduce((sum, r) => sum + r.weekData.accomplishments.length, 0);
+      const totalGoals = residentReports.reduce((sum, r) => sum + r.weekData.goals.length, 0);
+      const totalChores = residentReports.reduce((sum, r) => sum + r.weekData.chores.length, 0);
+      const totalNotes = residentReports.reduce((sum, r) => sum + r.weekData.notes.length, 0);
       const outstandingFees = residentReports.reduce((sum, r) => {
         const unpaidFees = r.weekData.programFees.filter(f => f.status !== 'paid');
         return sum + unpaidFees.reduce((feeSum, fee) => feeSum + (fee.amount || 0), 0);
       }, 0);
 
-      // Properly formatted report with clear separation between residents
-      const comprehensiveReport = residentReports.map(r => r.report).join('\n\n' + '='.repeat(80) + '\n\n');
+      // Generate executive summary with AI if available
+      let executiveSummary = '';
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const OpenAI = (await import('openai')).default;
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          
+          const summaryPrompt = `You are a professional sober living facility director. Create an executive summary for the weekly house report.
+
+House: ${house.name}
+Week: ${weekStart} to ${weekEnd}
+Total Residents: ${totalResidents}
+Total Incidents: ${totalIncidents}
+Total Meetings Attended: ${totalMeetings}
+Total Accomplishments: ${totalAccomplishments}
+Total Goals Set: ${totalGoals}
+Total Chores Assigned: ${totalChores}
+Total Notes: ${totalNotes}
+Outstanding Fees: $${outstandingFees.toFixed(2)}
+
+Provide:
+1. Overall house performance assessment
+2. Key highlights and concerns
+3. Trends and patterns observed
+4. Recommendations for the coming week
+5. Critical items requiring immediate attention
+
+Keep it professional, concise, and actionable. Focus on insights that help facility management.`;
+          
+          const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              {
+                role: "system",
+                content: "You are an experienced sober living facility director writing executive summaries for house reports. Be professional, insightful, and focus on actionable recommendations."
+              },
+              {
+                role: "user",
+                content: summaryPrompt
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 800
+          });
+          
+          executiveSummary = response.choices[0]?.message?.content || '';
+        }
+      } catch (error) {
+        console.log('Failed to generate executive summary:', error);
+      }
+
+      // Create comprehensive report with executive summary and individual reports
+      let comprehensiveReport = '';
+      
+      // Add executive summary if generated
+      if (executiveSummary) {
+        comprehensiveReport = `EXECUTIVE SUMMARY\n${'='.repeat(80)}\n\n${executiveSummary}\n\n`;
+      }
+      
+      // Add house statistics
+      comprehensiveReport += `HOUSE STATISTICS - ${house.name}\n${'='.repeat(80)}\n\n`;
+      comprehensiveReport += `Reporting Period: ${weekStart} to ${weekEnd}\n`;
+      comprehensiveReport += `Total Active Residents: ${totalResidents}\n`;
+      comprehensiveReport += `Total Incidents: ${totalIncidents}\n`;
+      comprehensiveReport += `Total Meetings Attended: ${totalMeetings}\n`;
+      comprehensiveReport += `Total Accomplishments: ${totalAccomplishments}\n`;
+      comprehensiveReport += `Total Goals Set: ${totalGoals}\n`;
+      comprehensiveReport += `Total Chores Assigned: ${totalChores}\n`;
+      comprehensiveReport += `Total Clinical Notes: ${totalNotes}\n`;
+      comprehensiveReport += `Outstanding Program Fees: $${outstandingFees.toFixed(2)}\n\n`;
+      
+      // Add individual resident reports with clear separation
+      comprehensiveReport += `INDIVIDUAL RESIDENT REPORTS\n${'='.repeat(80)}\n\n`;
+      comprehensiveReport += residentReports.map((r, index) => {
+        const separator = index < residentReports.length - 1 ? '\n\n' + '-'.repeat(80) + '\n\n' : '';
+        return r.report + separator;
+      }).join('');
       
       res.json({ 
         comprehensiveReport,
