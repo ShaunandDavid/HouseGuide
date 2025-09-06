@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { pgTable, varchar, boolean, timestamp, text, serial, integer } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { CATEGORY_VALUES } from "./categories";
 
 // Guide (Auth User) Schema
 export const insertGuideSchema = z.object({
@@ -93,13 +94,14 @@ export interface FileRecord {
   updated: string;
 }
 
-// Note Schema (Enhanced with OCR linking)
+// Note Schema (Enhanced with OCR linking and categories)
 export const insertNoteSchema = z.object({
   residentId: z.string(),
   houseId: z.string(),
   text: z.string().max(65536),
   source: z.enum(["manual", "ocr", "smart_ocr"]).default("manual"),
   linkedFileId: z.string().optional(), // Links to OCR source file
+  category: z.enum(CATEGORY_VALUES).default("general").optional(),
   createdBy: z.string(),
 });
 
@@ -112,6 +114,7 @@ export interface Note {
   text: string;
   source: "manual" | "ocr" | "smart_ocr";
   linkedFileId?: string;
+  category?: "work_school" | "demeanor" | "sponsor" | "medical" | "chores" | "general";
   createdBy: string;
   created: string;
   updated: string;
@@ -424,6 +427,7 @@ export const notes = pgTable("notes", {
   houseId: varchar("house_id").notNull(),
   text: text("text").notNull(),
   source: varchar("source", { length: 20 }).default("manual").notNull(),
+  category: varchar("category", { length: 32 }).default("general"),
   linkedFileId: varchar("linked_file_id"),
   createdBy: varchar("created_by").notNull(),
   created: timestamp("created").defaultNow().notNull(),

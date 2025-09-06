@@ -25,6 +25,7 @@ export type Entry = {
   text: string;
   createdAt: string;
   tags?: string[];
+  category?: "work_school" | "demeanor" | "sponsor" | "medical" | "chores" | "general";
 };
 
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-3.5-turbo"; // use "gpt-5" if enabled in your env
@@ -228,6 +229,20 @@ async function classifyWithLLM(entries: Entry[]): Promise<Classification> {
   return parsed.data;
 }
 
+/** ---------------- Category-Based Routing ---------------- **/
+
+function routeByExplicitCategory(entry: Entry): z.infer<typeof SectionId> | null {
+  // Map explicit user categories to report sections
+  switch(entry.category) {
+    case "work_school": return "WorkSchool";
+    case "demeanor": return "DemeanorParticipation";
+    case "sponsor": return "SponsorMentor";
+    case "medical": return "ProfessionalHelpAppointments";
+    case "chores": return "ChoresCompliance";
+    default: return null;
+  }
+}
+
 /** ---------------- Employment Corrector ---------------- **/
 
 function isEmploymentContent(text: string): boolean {
@@ -315,64 +330,107 @@ export async function generateWeeklyReport(
   
   const sanitized = redactEntries(entries);
 
-  // Try LLM first
-  let classification: Classification | null = null;
+  // First, try to classify using explicit categories
+  const buckets: Record<z.infer<typeof SectionId>, z.infer<typeof SectionBucket>["items"]> = {
+    SponsorMentor: [],
+    WorkSchool: [],
+    ChoresCompliance: [],
+    DemeanorParticipation: [],
+    ProfessionalHelpAppointments: [],
+  };
+  const uncategorized: string[] = [];
+  
+  // Route entries by explicit category first
+  for (const e of sanitized) {
+    const explicitRoute = routeByExplicitCategory(e);
+    if (explicitRoute) {
+      buckets[explicitRoute].push({
+        id: e.id,
+        sourceType: e.type,
+        text: e.text,
+        reason: "User-selected category",
+        confidence: 1.0, // 100% confidence for user selections
+        date: e.createdAt,
+        tags: e.tags,
+      });
+    } else {
+      uncategorized.push(e.id); // Will be processed by AI later
+    }
+  }
+  
+  // Try LLM for uncategorized entries
   let llmUsed = false;
   
-  try {
-    classification = await classifyWithLLM(sanitized);
-    llmUsed = true;
-    console.info("[REPORT] LLM classification successful");
-  } catch (e) {
-    console.warn("[REPORT] LLM classification failed, using rule-based fallback:", e);
-    // Fallback to deterministic rules
-    const buckets: Record<z.infer<typeof SectionId>, z.infer<typeof SectionBucket>["items"]> = {
-      SponsorMentor: [],
-      WorkSchool: [],
-      ChoresCompliance: [],
-      DemeanorParticipation: [],
-      ProfessionalHelpAppointments: [],
-    };
-    const uncategorized: string[] = [];
-
-    for (const e of sanitized) {
-      const where = ruleRoute(e);
-      if (where) {
-        buckets[where].push({
-          id: e.id,
-          sourceType: e.type,
-          text: e.text,
-          reason: "Rule-based fallback",
-          confidence: 0.55,
-          date: e.createdAt,
-          tags: e.tags,
-        });
-      } else {
-        uncategorized.push(e.id);
+  if (uncategorized.length > 0) {
+    const uncategorizedEntries = sanitized.filter(e => uncategorized.includes(e.id));
+    
+    try {
+      const llmClassification = await classifyWithLLM(uncategorizedEntries);
+      llmUsed = true;
+      console.info("[REPORT] LLM classification successful for uncategorized entries");
+      
+      // Merge LLM results with explicit category results
+      for (const section of Object.keys(llmClassification.sections) as z.infer<typeof SectionId>[]) {
+        buckets[section].push(...llmClassification.sections[section].items);
       }
+      // Clear uncategorized since LLM processed them
+      uncategorized.length = 0;
+      uncategorized.push(...llmClassification.uncategorized);
+    } catch (e) {
+      console.warn("[REPORT] LLM classification failed, using rule-based fallback:", e);
+      // Fallback to deterministic rules for uncategorized entries
+      
+      const stillUncategorized: string[] = [];
+      for (const eId of uncategorized) {
+        const e = sanitized.find(entry => entry.id === eId);
+        if (!e) continue;
+        
+        const where = ruleRoute(e);
+        if (where) {
+          buckets[where].push({
+            id: e.id,
+            sourceType: e.type,
+            text: e.text,
+            reason: "Rule-based fallback",
+            confidence: 0.55,
+            date: e.createdAt,
+            tags: e.tags,
+          });
+        } else {
+          stillUncategorized.push(e.id);
+        }
+      }
+      uncategorized.length = 0;
+      uncategorized.push(...stillUncategorized);
     }
-
-    const summarize = (items: typeof buckets.SponsorMentor) => {
-      if (!items.length) return "No updates recorded in this category for the period.";
-      const count = items.length;
-      const typeSet = new Set(items.map((i) => i.sourceType));
-      const types = Array.from(typeSet).join(", ");
-      return `Recorded ${count} item(s) (${types}). Key notes reflect typical activity and compliance for this week.`;
-    };
-
-    classification = {
-      sections: {
-        SponsorMentor: { items: buckets.SponsorMentor, summary: summarize(buckets.SponsorMentor) },
-        WorkSchool: { items: buckets.WorkSchool, summary: summarize(buckets.WorkSchool) },
-        ChoresCompliance: { items: buckets.ChoresCompliance, summary: summarize(buckets.ChoresCompliance) },
-        DemeanorParticipation: { items: buckets.DemeanorParticipation, summary: summarize(buckets.DemeanorParticipation) },
-        ProfessionalHelpAppointments: { items: buckets.ProfessionalHelpAppointments, summary: summarize(buckets.ProfessionalHelpAppointments) },
-      },
-      uncategorized,
-      overallSummary:
-        "Automated rule-based fallback enabled due to AI unavailability. Entries routed by deterministic heuristics.",
-    };
+  } else {
+    console.info("[REPORT] All entries have user-selected categories, skipping AI classification");
   }
+  
+  // Create final classification from buckets
+  const summarize = (items: typeof buckets.SponsorMentor) => {
+    if (!items.length) return "No updates recorded in this category for the period.";
+    const count = items.length;
+    const typeSet = new Set(items.map((i) => i.sourceType));
+    const types = Array.from(typeSet).join(", ");
+    return `Recorded ${count} item(s) (${types}). Key notes reflect typical activity and compliance for this week.`;
+  };
+
+  let classification: Classification = {
+    sections: {
+      SponsorMentor: { items: buckets.SponsorMentor, summary: summarize(buckets.SponsorMentor) },
+      WorkSchool: { items: buckets.WorkSchool, summary: summarize(buckets.WorkSchool) },
+      ChoresCompliance: { items: buckets.ChoresCompliance, summary: summarize(buckets.ChoresCompliance) },
+      DemeanorParticipation: { items: buckets.DemeanorParticipation, summary: summarize(buckets.DemeanorParticipation) },
+      ProfessionalHelpAppointments: { items: buckets.ProfessionalHelpAppointments, summary: summarize(buckets.ProfessionalHelpAppointments) },
+    },
+    uncategorized,
+    overallSummary: llmUsed 
+      ? "Report generated with user categories and AI classification assistance."
+      : uncategorized.length > 0 
+        ? "Report generated with user categories and rule-based classification."
+        : "Report generated from user-categorized entries.",
+  };
 
   // Apply employment corrector to fix any miscategorized work content
   classification = correctEmploymentLeak(classification);

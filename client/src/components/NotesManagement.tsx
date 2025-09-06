@@ -8,8 +8,11 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { PlusIcon, FileTextIcon, ScanTextIcon, CalendarIcon } from "lucide-react";
 import { MicInput } from "@/components/MicInput";
+import { CategoryPills } from "@/components/CategoryPills";
 import { createNote, getNotesByResident } from "@/lib/api";
 import type { Note, InsertNote } from "@shared/schema";
+import type { Category } from "@shared/categories";
+import { CATEGORY_LABEL, CATEGORY_ICON } from "@shared/categories";
 import { format } from "date-fns";
 
 interface NotesManagementProps {
@@ -25,6 +28,7 @@ interface NoteFormData {
 export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesManagementProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -39,6 +43,7 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notes", residentId] });
       setNewNoteText("");
+      setSelectedCategory(undefined);
       setIsCreating(false);
       toast({
         title: "Note Created",
@@ -63,6 +68,7 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
       residentId,
       text: newNoteText.trim(),
       source: "manual" as const,
+      category: selectedCategory || "general",
       // houseId and createdBy will be set by the backend from auth
     };
 
@@ -71,6 +77,7 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
 
   const handleCancelCreate = () => {
     setNewNoteText("");
+    setSelectedCategory(undefined);
     setIsCreating(false);
   };
 
@@ -129,6 +136,12 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
             <CardTitle className="text-base">Create New Note</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <CategoryPills value={selectedCategory} onChange={setSelectedCategory} />
+            {selectedCategory && (
+              <div className="text-xs text-gray-600 -mt-2 mb-2">
+                Category: {CATEGORY_ICON[selectedCategory]} {CATEGORY_LABEL[selectedCategory]}
+              </div>
+            )}
             <div className="relative">
               <Textarea
                 ref={noteTextareaRef}
@@ -216,6 +229,11 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
                     >
                       {note.source === "manual" ? "Manual Note" : "OCR Extracted"}
                     </Badge>
+                    {note.category && note.category !== "general" && (
+                      <Badge variant="secondary" className="text-xs">
+                        {CATEGORY_ICON[note.category]} {CATEGORY_LABEL[note.category]}
+                      </Badge>
+                    )}
                     {note.linkedFileId && (
                       <Badge variant="outline" className="text-xs">
                         Linked to Image

@@ -1,0 +1,191 @@
+Short answer: yes—tighten it. Make categories a single source of truth, add a DB enum + index, wire the API, and make the UI buttons a tiny reusable component. Here’s the ship-ready version.
+
+Paste-ables (minimal, solid)
+1) shared/categories.ts
+// single source of truth
+export const CATEGORY_VALUES = [
+  "work_school",
+  "demeanor",
+  "sponsor",
+  "medical",
+  "chores",
+  "general",
+] as const;
+
+export type Category = typeof CATEGORY_VALUES[number];
+
+export const CATEGORY_LABEL: Record<Category,string> = {
+  work_school: "Work/School",
+  demeanor:    "Demeanor",
+  sponsor:     "Sponsor/Recovery",
+  medical:     "Medical",
+  chores:      "Chores",
+  general:     "General",
+};
+
+2) shared/schema.ts (snippet)
+import { z } from "zod";
+import { CATEGORY_VALUES } from "./categories";
+
+export const insertNoteSchema = z.object({
+  residentId: z.string().min(1),
+  text: z.string().min(1),
+  // NEW:
+  category: z.enum(CATEGORY_VALUES).default("general").optional(),
+});
+
+3) DB migration (Postgres)
+
+File: prisma/migrations/<timestamp>__add_note_category/migration.sql
+
+-- add enum-like check + index; default keeps old notes valid
+ALTER TABLE "notes"
+  ADD COLUMN "category" VARCHAR(32) NOT NULL DEFAULT 'general',
+  ADD CONSTRAINT notes_category_check
+    CHECK ("category" IN ('work_school','demeanor','sponsor','medical','chores','general'));
+
+CREATE INDEX IF NOT EXISTS idx_notes_category ON "notes"("category");
+
+
+(If Prisma model used, add category String @default("general") and run prisma migrate dev.)
+
+4) API: accept + persist
+
+File: server/routers/notes.ts (or your tRPC route)
+
+import { insertNoteSchema } from "../../shared/schema";
+import { CATEGORY_VALUES, type Category } from "../../shared/categories";
+
+const normalizeCategory = (c?: string): Category => {
+  return (CATEGORY_VALUES as readonly string[]).includes(c ?? "")
+    ? (c as Category)
+    : "general";
+};
+
+notesRouter.mutation("insert", {
+  input: insertNoteSchema,
+  async resolve({ input, ctx }) {
+    const category = normalizeCategory(input.category);
+    return ctx.db.note.create({
+      data: {
+        residentId: input.residentId,
+        text: input.text.trim(),
+        category,
+      },
+    });
+  },
+});
+
+5) Reusable UI pills
+
+File: components/CategoryPills.tsx
+
+import { CATEGORY_VALUES, CATEGORY_LABEL, type Category } from "../shared/categories";
+
+export function CategoryPills({
+  value, onChange,
+}: { value: Category | undefined; onChange: (c: Category) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2 mb-4">
+      {CATEGORY_VALUES.filter(c => c !== "general").map((c) => {
+        const active = value === c;
+        return (
+          <button
+            key={c}
+            type="button"
+            aria-pressed={active}
+            className={`px-2 py-1 rounded border text-sm ${active ? "bg-primary text-white border-primary" : "bg-background border-muted-foreground/30"}`}
+            onClick={() => onChange(c)}
+          >
+            {c === "work_school" && "💼 "} 
+            {c === "demeanor" && "😊 "}
+            {c === "sponsor" && "🤝 "}
+            {c === "medical" && "🏥 "}
+            {c === "chores" && "🧹 "}
+            {CATEGORY_LABEL[c]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+6) Wire into note form
+
+File: components/NotesManagement.tsx (snippet)
+
+import { useState } from "react";
+import type { Category } from "../shared/categories";
+import { CategoryPills } from "./CategoryPills";
+
+export function NoteComposer({ onSubmit }: { onSubmit: (p: { text: string; category?: Category }) => void }) {
+  const [text, setText] = useState("");
+  const [category, setCategory] = useState<Category | undefined>(undefined);
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); onSubmit({ text, category }); setText(""); }}
+      className="space-y-3"
+    >
+      <CategoryPills value={category} onChange={setCategory} />
+      <textarea value={text} onChange={(e)=>setText(e.target.value)} rows={3} className="w-full border rounded p-2" placeholder="Add a note…" />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {category ? `Category: ${category}` : "No category (defaults to General)"}
+        </span>
+        <button type="submit" className="btn btn-primary">Save Note</button>
+      </div>
+    </form>
+  );
+}
+
+7) Report generation override (AI fallback only if missing)
+
+File: server/generateWeeklyReport.ts (snippet)
+
+import type { Category } from "../shared/categories";
+
+function inferFromText(text: string): Category | undefined {
+  // optional: lightweight fallback (hashtags/prefix)
+  const t = text.toLowerCase();
+  if (/#work\b/.test(t) || /^work[:\-]/.test(t)) return "work_school";
+  if (/#demeanor\b/.test(t) || /^behavior[:\-]/.test(t)) return "demeanor";
+  if (/#sponsor\b/.test(t)) return "sponsor";
+  if (/#medical\b/.test(t)) return "medical";
+  if (/#chores?\b/.test(t)) return "chores";
+  return undefined;
+}
+
+function pickCategory(note: { category?: Category; text: string }): Category {
+  return note.category ?? inferFromText(note.text) ?? aiClassify(note.text) ?? "general";
+}
+
+// then group notes by pickCategory(note) BEFORE anything else
+
+8) Unit tests (tiny but useful)
+
+File: tests/category.spec.ts
+
+import { expect, test } from "vitest";
+import { pickCategory } from "../server/generateWeeklyReport";
+
+test("explicit category wins", () => {
+  expect(pickCategory({ category: "work_school", text: "works at Target" })).toBe("work_school");
+});
+
+test("prefix/hashtag fallback", () => {
+  expect(pickCategory({ text: "WORK: hired at CIPA USA" })).toBe("work_school");
+  expect(pickCategory({ text: "Seemed agitated #demeanor" })).toBe("demeanor");
+});
+
+Why this version
+
+Single source of truth for categories (prevents drift across UI/API/AI).
+
+DB default = general → backward compatible; index speeds reporting.
+
+UI pills reusable + accessible (aria-pressed), clear affordance.
+
+Report logic: explicit > heuristic > AI > general (no more misfiled work notes).
+
+Minimal code surface; easy to paste and ship.

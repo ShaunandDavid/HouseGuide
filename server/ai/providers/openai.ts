@@ -75,7 +75,8 @@ export class OpenAIProvider implements AIProvider {
         type: 'note',
         text: note.text,
         createdAt: note.created || new Date().toISOString(),
-        tags: [note.source].filter(Boolean)
+        tags: [note.source].filter(Boolean),
+        category: note.category // Pass through the user-selected category
       });
     });
     
