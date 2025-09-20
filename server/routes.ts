@@ -1129,8 +1129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.guide.id
       };
       
+      // Debug logging removed for production security and compliance
+      
       const validatedData = insertNoteSchema.parse(noteData);
       const note = await storage.createNote(validatedData);
+      
       res.status(201).json(note);
     } catch (error) {
       console.error('Create note error:', error);

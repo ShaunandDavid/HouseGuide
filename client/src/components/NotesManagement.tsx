@@ -68,9 +68,11 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
       residentId,
       text: newNoteText.trim(),
       source: "manual" as const,
-      category: selectedCategory || "general",
+      category: selectedCategory, // Don't default to "general" - let backend handle it
       // houseId and createdBy will be set by the backend from auth
     };
+
+    // Debug logging removed for production security
 
     createNoteMutation.mutate(noteData as InsertNote);
   };

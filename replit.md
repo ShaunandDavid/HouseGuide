@@ -1,6 +1,23 @@
 # Overview
 
-HouseGuide is a Progressive Web Application (PWA) designed for residential care facility management. The application enables staff to scan documents using on-device OCR technology (Tesseract.js), automatically classify them as either commitments or write-ups, store files per resident, and generate structured weekly reports. The system is built with a React frontend and Express backend, utilizing Drizzle ORM with PostgreSQL for data persistence.
+HouseGuide is a Progressive Web Application (PWA) designed for residential care facility management. The application enables staff to scan documents using on-device OCR technology (Tesseract.js), automatically classify them as either commitments or write-ups, store files per resident, and generate structured weekly reports with user-controlled note categorization. The system is built with a React frontend and Express backend, utilizing Drizzle ORM with PostgreSQL for data persistence.
+
+## Recent Critical Fixes (September 2025)
+
+### Category System Production Fix
+**Issue**: Critical bug where user-selected note categories were being saved as "general" instead of the chosen category (work_school, demeanor, sponsor, medical, chores), breaking the automated report generation system.
+
+**Root Cause**: Two separate note creation flows existed:
+- Quick Note modal (missing category selection entirely) 
+- Regular Notes section (had category selection)
+
+**Solution**: 
+- Added full category selection system to QuickNoteModal component
+- Ensured both note creation paths have identical functionality
+- Removed premature frontend defaulting to "general"
+- Applied production security by removing debug logs containing sensitive content
+
+**Impact**: System now correctly preserves user-selected categories for accurate report section placement, critical for the $20M commercial deployment targeting 18,000+ sober living businesses.
 
 # User Preferences
 
