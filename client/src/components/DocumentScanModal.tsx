@@ -125,6 +125,7 @@ export function DocumentScanModal({
       
       // Create linked note with OCR text if there is text
       if (ocrResult && ocrResult.trim()) {
+        // First create the main OCR note (uncategorized)
         await createNote({
           residentId,
           houseId,
@@ -133,22 +134,78 @@ export function DocumentScanModal({
           linkedFileId: fileRecord.id,
           createdBy: currentUser.id
         });
-        
-        // Auto-populate trackers and smart notes from OCR text
-        const populateResult = await autoPopulateTrackers(ocrResult, residentId, houseId, currentUser.id);
-        if (populateResult.created > 0) {
-          const noteCount = populateResult.entries.filter(e => e.type === 'note').length;
-          const trackerCount = populateResult.created - noteCount;
-          const message = noteCount > 0 && trackerCount > 0 
-            ? `Created ${trackerCount} tracker entries and ${noteCount} smart notes`
-            : noteCount > 0 
-            ? `Created ${noteCount} categorized smart notes`
-            : `Created ${trackerCount} tracker entries`;
-            
-          toast({
-            title: "Auto-populated from OCR",
-            description: message,
+
+        // Then categorize OCR text and create categorized notes (like voice notes)
+        try {
+          const categorizeResponse = await fetch('/api/notes/categorize-voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              transcript: ocrResult,
+              residentId
+            })
           });
+
+          if (categorizeResponse.ok) {
+            const categorizationResult = await categorizeResponse.json();
+            
+            // Create individual categorized notes for each segment
+            const categorizedNotes = categorizationResult.segments.map((segment: any) => 
+              createNote({
+                residentId,
+                houseId,
+                text: segment.text,
+                source: 'smart_ocr',
+                category: segment.category,
+                linkedFileId: fileRecord.id,
+                createdBy: currentUser.id
+              })
+            );
+
+            await Promise.all(categorizedNotes);
+
+            toast({
+              title: "OCR Content Categorized",
+              description: `Created ${categorizationResult.segments.length} categorized notes from OCR text for weekly reports.`,
+            });
+          } else {
+            // Fallback to auto-populate if categorization fails
+            const populateResult = await autoPopulateTrackers(ocrResult, residentId, houseId, currentUser.id);
+            if (populateResult.created > 0) {
+              const noteCount = populateResult.entries.filter(e => e.type === 'note').length;
+              const trackerCount = populateResult.created - noteCount;
+              const message = noteCount > 0 && trackerCount > 0 
+                ? `Created ${trackerCount} tracker entries and ${noteCount} smart notes`
+                : noteCount > 0 
+                ? `Created ${noteCount} categorized smart notes`
+                : `Created ${trackerCount} tracker entries`;
+                
+              toast({
+                title: "Auto-populated from OCR",
+                description: message,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('OCR categorization failed, falling back to auto-populate:', error);
+          
+          // Fallback to auto-populate trackers and smart notes from OCR text
+          const populateResult = await autoPopulateTrackers(ocrResult, residentId, houseId, currentUser.id);
+          if (populateResult.created > 0) {
+            const noteCount = populateResult.entries.filter(e => e.type === 'note').length;
+            const trackerCount = populateResult.created - noteCount;
+            const message = noteCount > 0 && trackerCount > 0 
+              ? `Created ${trackerCount} tracker entries and ${noteCount} smart notes`
+              : noteCount > 0 
+              ? `Created ${noteCount} categorized smart notes`
+              : `Created ${trackerCount} tracker entries`;
+              
+            toast({
+              title: "Auto-populated from OCR",
+              description: message,
+            });
+          }
         }
       }
       
