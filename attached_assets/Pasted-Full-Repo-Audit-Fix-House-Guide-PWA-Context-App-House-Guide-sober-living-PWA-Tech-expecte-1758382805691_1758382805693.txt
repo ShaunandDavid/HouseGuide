@@ -1,0 +1,258 @@
+Full Repo Audit & Fix (House Guide PWA)
+
+Context
+
+App: House Guide (sober-living PWA)
+
+Tech (expected): Next.js (App Router), TypeScript, shadcn/ui (Radix), Tailwind, Supabase (Auth/DB), PWA (manifest + service worker), Vercel/Railway compatible
+
+Goals: Robust build, clean DX, a11y, offline-first, secure Supabase policies, test coverage, perf, and CI green.
+
+Do not edit secrets. If env values are missing, halt and request them.
+
+Objectives
+
+Run a comprehensive health check and fix everything that is broken, flaky, misconfigured, or sub-par.
+
+Implement missing tests, types, lint rules, a11y fixes, and PWA essentials.
+
+Harden security (dependencies, headers, Supabase RLS), improve perf (bundle/code-split), and ensure DX (scripts, README).
+
+Produce a clean PR with diffs, test/lighthouse reports, and a changelog.
+
+Repo Inputs (fill before running)
+
+Repo/Project: {{replit-project-url-or-name}}
+
+Node version: {{node_version}} (default 20.x)
+
+Package manager: {{npm|pnpm|yarn}} (default npm)
+
+Supabase project ref: {{supabase_ref}}
+
+Required env:
+
+NEXT_PUBLIC_SUPABASE_URL={{url}}
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY={{key}}
+
+(If RLS admin tasks): SUPABASE_SERVICE_ROLE_KEY={{service_role_key}}
+
+If any are missing, stop and ask for them.
+
+Phases (execute in order)
+0) Inventory & Assumptions
+
+Detect framework + versions, list critical files: next.config.*, app/**, pages/** (if any), components/**, lib/**, supabase/**, public/manifest.webmanifest, public/sw.*, tailwind.config.*, .eslintrc.*, tsconfig.*.
+
+Emit a tree of the project (top 3 levels) and a dependency map (prod/dev).
+
+1) Setup & Baseline
+
+Use Node {{node_version}}. Run:
+
+corepack enable (if using pnpm/yarn)
+
+npm ci (or equivalent)
+
+npm run build → capture errors/warnings.
+
+npm run dev → confirm boots locally.
+
+If scripts missing, add in package.json:
+
+"lint", "format", "typecheck", "test", "test:watch", "build", "preview"
+
+2) Lint/Format/Types
+
+Add/standardize: ESLint (next, @typescript-eslint), Prettier, Tailwind plugin, import/order, radix-a11y rules.
+
+Run and auto-fix:
+
+npm run lint -- --fix
+
+npm run format
+
+npm run typecheck (tsc --noEmit)
+
+Resolve all type errors with minimal, correct typings (no any unless justified).
+
+3) Testing (Unit + E2E)
+
+If absent, install Vitest + Testing Library for React; configure setupTests.ts.
+
+Minimum coverage targets:
+
+Core UI: buttons, forms, dialog flows.
+
+Lib: data utils, auth guards.
+
+Add Playwright for E2E (happy paths): auth, create/edit checklist, offline usage, role-gated routes.
+
+Add npm run test and npm run test:e2e to CI.
+
+4) PWA Audit
+
+Verify manifest.webmanifest: name, short_name, icons (192/512), theme/background colors, start_url, display: standalone.
+
+Ensure service worker (Next-PWA or custom) caching strategies for:
+
+static assets, fonts
+
+API calls (stale-while-revalidate where safe)
+
+offline fallback for core routes
+
+Run Lighthouse (PWA, Performance, A11y, Best Practices, SEO). Target ≥ 90 on all; output HTML report.
+
+5) A11y & UI/UX (shadcn/ui)
+
+Ensure Radix primitives used correctly (ARIA, keyboard traps, focus rings).
+
+Add skip-links, proper landmarks, color contrast ≥ 4.5:1.
+
+Mobile/desktop responsive checks for all key screens:
+
+Daily rules/announcements
+
+Chore/checklist CRUD
+
+Incident log
+
+Resource directory
+
+Admin dashboard (roles)
+
+Fix any hydration warnings and uncontrolled→controlled input issues.
+
+6) Auth & Roles (Supabase)
+
+Verify Supabase client init, SSR safety, and route protection.
+
+Implement/confirm RLS policies:
+
+Members can read/write own items where appropriate.
+
+Only admins can manage global announcements, user roles, and house-level settings.
+
+Provide SQL migration files for any schema/policy changes under supabase/migrations/*.sql.
+
+Ensure server actions or API routes do not expose service keys.
+
+7) Data & Offline
+
+Where applicable, add optimistic UI and reconcile on re-connect.
+
+Implement IndexedDB (or local storage fallback) for drafts/offline queues for checklist/incident forms.
+
+Add explicit error states and retry flows.
+
+8) Security & Hardening
+
+npm audit fix (or selective upgrade if breaking).
+
+Lock headers (Next.js middleware or config):
+
+Content-Security-Policy (self + necessary origins)
+
+X-Frame-Options: DENY
+
+X-Content-Type-Options: nosniff
+
+Referrer-Policy: strict-origin-when-cross-origin
+
+Permissions-Policy (minimal)
+
+Remove unused deps, dead code, dev-only endpoints.
+
+Check rate limiting on any mutation endpoints.
+
+9) Performance
+
+Add next/bundle-analyzer; identify heavy imports; code-split where needed.
+
+Image optimization via Next/Image; preconnect/preload critical fonts.
+
+Ensure React Server Components where beneficial; memoization for expensive client components.
+
+10) DX & CI
+
+Add GitHub Actions or Replit CI:
+
+install → lint → typecheck → test → build → (optionally) e2e
+
+Update README.md with:
+
+quick start
+
+env var table
+
+scripts
+
+deploy notes (Vercel/Railway)
+
+Add .nvmrc, .editorconfig, and consistent tsconfig.json.
+
+11) Deliverables
+
+Produce, commit, and link:
+
+Diff summary (file-by-file) and rationale.
+
+Lighthouse report (HTML/PDF) saved under reports/lighthouse-{{timestamp}}.html.
+
+Test results + coverage summary (reports/coverage/).
+
+Schema/RLS migrations (supabase/migrations/*.sql) with commentary.
+
+CHANGELOG.md with categorized changes (Added/Fixed/Changed/Security).
+
+OPEN ISSUES section for non-blocking follow-ups.
+
+12) PR Policy
+
+Single PR named: feat/audit-fix-house-guide-{{date}}
+
+Conventional commits inside PR.
+
+No secret values committed. .env* in .gitignore.
+
+Verification Checklist (agent must confirm with evidence)
+
+✅ npm run build passes without warnings that indicate real issues.
+
+✅ npm run typecheck clean; no any hot-spots without justification.
+
+✅ npm run test ≥ 80% statements/branches on core modules.
+
+✅ Playwright e2e green for auth, checklist CRUD, offline flow, admin route-guard.
+
+✅ Lighthouse ≥ 90 across categories; PWA installable.
+
+✅ Supabase RLS policies enforced; least privilege proved via test queries.
+
+✅ Security headers applied and validated (show response headers).
+
+✅ Bundle analysis before/after (sizes reduced or justified).
+
+✅ README/CI updated; developer can clone, set envs, run, and ship.
+
+If Something Fails
+
+Stop, summarize root cause, propose 2–3 fixes with trade-offs, implement the safest now, backlog the rest in OPEN ISSUES.
+
+Interaction Rules
+
+Ask only for missing envs or explicit product decisions (e.g., caching policy that affects data correctness).
+
+Otherwise, proceed and fix.
+
+Start Now
+
+Clone/open {{replit-project-url-or-name}}.
+
+Detect stack and print inventory.
+
+Execute Phases 1–12.
+
+Open a PR with all reports attached and a tight summary.

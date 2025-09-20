@@ -222,10 +222,29 @@ async function classifyWithLLM(entries: Entry[]): Promise<Classification> {
   });
 
   const raw = response.choices[0]?.message?.content || "";
-  const parsed = ClassificationSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error("LLM returned invalid JSON classification");
+  console.log("[LLM] Raw response:", raw);
+  
+  let parsed;
+  try {
+    parsed = ClassificationSchema.safeParse(JSON.parse(raw));
+  } catch (parseError) {
+    console.error("[LLM] JSON parse error:", parseError);
+    throw new Error(`LLM returned invalid JSON: ${parseError}`);
   }
+  
+  if (!parsed.success) {
+    console.error("[LLM] Schema validation failed:", parsed.error);
+    throw new Error(`LLM returned invalid JSON classification: ${parsed.error.message}`);
+  }
+  
+  console.log("[LLM] Successfully parsed classification:", {
+    sections: Object.keys(parsed.data.sections).map(k => ({
+      section: k,
+      items: parsed.data.sections[k as keyof typeof parsed.data.sections].items.length
+    })),
+    uncategorized: parsed.data.uncategorized.length
+  });
+  
   return parsed.data;
 }
 
