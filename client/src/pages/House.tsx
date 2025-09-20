@@ -5,10 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText } from "lucide-react";
+import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText, X } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { ComprehensiveReportModal } from "@/components/ComprehensiveReportModal";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { House, Resident, FileRecord } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -28,6 +31,9 @@ export default function House() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'graduated'>('all');
   const [isLoadingPage, setIsLoadingPage] = useState(true); // Renamed to avoid conflict with useQuery's isLoading
   const [showComprehensiveReport, setShowComprehensiveReport] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showRenameFacility, setShowRenameFacility] = useState(false);
+  const [newFacilityName, setNewFacilityName] = useState('');
   const { toast } = useToast();
 
   const { isLoading, error } = useQuery({
@@ -111,6 +117,33 @@ export default function House() {
     }
   };
 
+  const handleRenameFacility = async () => {
+    if (!newFacilityName.trim() || !house?.id) return;
+    
+    try {
+      await apiRequest(`/api/houses/${house.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: newFacilityName.trim() }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      // Update local state
+      setHouse(prev => prev ? { ...prev, name: newFacilityName.trim() } : null);
+      setShowRenameFacility(false);
+      
+      toast({
+        title: "Facility Renamed",
+        description: "Your facility name has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to rename facility. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoadingPage) { // Use the renamed isLoadingPage state
     return (
       <div className="min-h-screen flex items-center justify-center" data-testid="house-loading">
@@ -162,7 +195,13 @@ export default function House() {
               <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Residential Care Management</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="flex-shrink-0" data-testid="settings-button">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex-shrink-0" 
+            onClick={() => setShowSettings(true)}
+            data-testid="settings-button"
+          >
             <Settings className="w-4 h-4" />
           </Button>
         </div>
@@ -181,7 +220,16 @@ export default function House() {
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Complete Your Setup</h3>
                   <p className="text-sm sm:text-base text-gray-600 mb-4">Give your facility a name and start onboarding residents.</p>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-                    <Button size="sm" variant="outline" className="w-full sm:w-auto">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        setNewFacilityName(house?.name?.replace('Dashboard', '') || '');
+                        setShowRenameFacility(true);
+                      }}
+                      data-testid="rename-facility-button"
+                    >
                       <Settings className="w-4 h-4 mr-2" />
                       <span className="hidden sm:inline">Rename Facility</span>
                       <span className="sm:hidden">Rename</span>
@@ -365,6 +413,73 @@ export default function House() {
         isOpen={showComprehensiveReport}
         onClose={() => setShowComprehensiveReport(false)}
       />
+
+      {/* Settings Modal */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+          </DialogHeader>
+          <div className="py-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Facility Information</Label>
+                <p className="text-sm text-gray-600">Current facility: {house?.name}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">User Account</Label>
+                <p className="text-sm text-gray-600">Logged in as: {currentUser?.email}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Application Version</Label>
+                <p className="text-sm text-gray-600">HouseGuide v1.0.0</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowSettings(false)} data-testid="close-settings">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Facility Modal */}
+      <Dialog open={showRenameFacility} onOpenChange={setShowRenameFacility}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Facility</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="facility-name">Facility Name</Label>
+              <Input
+                id="facility-name"
+                value={newFacilityName}
+                onChange={(e) => setNewFacilityName(e.target.value)}
+                placeholder="Enter facility name"
+                data-testid="input-facility-name"
+              />
+            </div>
+          </div>
+          <DialogFooter className="space-x-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowRenameFacility(false)}
+              data-testid="cancel-rename"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRenameFacility}
+              disabled={!newFacilityName.trim()}
+              data-testid="save-facility-name"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

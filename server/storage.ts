@@ -18,6 +18,7 @@ export interface IStorage {
   getHouse(id: string): Promise<House | undefined>;
   getHouseByName(name: string): Promise<House | undefined>;
   createHouse(house: InsertHouse): Promise<House>;
+  updateHouse(id: string, updates: Partial<InsertHouse>): Promise<House>;
   getAllHouses(): Promise<House[]>;
   
   // Residents
