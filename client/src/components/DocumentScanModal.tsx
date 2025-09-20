@@ -361,7 +361,7 @@ export function DocumentScanModal({
                 <Button 
                   className="flex-1" 
                   onClick={handleSaveDocument}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !selectedFile || !classification}
                   data-testid="save-document-button"
                 >
                   Save Document
