@@ -1,4 +1,4 @@
-import { FileText, AlertTriangle } from "lucide-react";
+import { FileText, AlertTriangle, Camera, File } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,50 @@ interface FileCardProps {
 }
 
 export function FileCard({ file, onViewFile }: FileCardProps) {
-  const isCommitment = file.type === 'commitment';
-  const Icon = isCommitment ? FileText : AlertTriangle;
+  // Get proper icon and styling based on file type
+  const getFileTypeInfo = (type: string) => {
+    switch (type) {
+      case 'commitment':
+        return {
+          icon: FileText,
+          bgColor: 'bg-green-100',
+          textColor: 'text-green-600',
+          badgeBg: 'bg-green-100',
+          badgeText: 'text-green-800',
+          label: 'Commitment'
+        };
+      case 'writeup':
+        return {
+          icon: AlertTriangle,
+          bgColor: 'bg-amber-100',
+          textColor: 'text-amber-600',
+          badgeBg: 'bg-amber-100',
+          badgeText: 'text-amber-800',
+          label: 'Write-up'
+        };
+      case 'photo':
+        return {
+          icon: Camera,
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-600',
+          badgeBg: 'bg-blue-100',
+          badgeText: 'text-blue-800',
+          label: 'Photo'
+        };
+      default: // 'general' or any other type
+        return {
+          icon: File,
+          bgColor: 'bg-gray-100',
+          textColor: 'text-gray-600',
+          badgeBg: 'bg-gray-100',
+          badgeText: 'text-gray-800',
+          label: 'General'
+        };
+    }
+  };
+
+  const typeInfo = getFileTypeInfo(file.type || 'general');
+  const Icon = typeInfo.icon;
   
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -40,22 +82,18 @@ export function FileCard({ file, onViewFile }: FileCardProps) {
     <Card className="hover:shadow-md transition-shadow" data-testid={`file-card-${file.id}`}>
       <CardContent className="p-4">
         <div className="flex items-start space-x-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-            isCommitment ? 'bg-green-100' : 'bg-amber-100'
-          }`}>
-            <Icon className={`w-5 h-5 ${
-              isCommitment ? 'text-green-600' : 'text-amber-600'
-            }`} />
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${typeInfo.bgColor}`}>
+            <Icon className={`w-5 h-5 ${typeInfo.textColor}`} />
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <Badge 
                 variant="secondary"
-                className={isCommitment ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}
+                className={`${typeInfo.badgeBg} ${typeInfo.badgeText}`}
                 data-testid={`badge-${file.type}`}
               >
-                {isCommitment ? 'Commitment' : 'Write-up'}
+                {typeInfo.label}
               </Badge>
               <span className="text-sm text-muted-foreground" data-testid="file-date">
                 {formatDate(file.created)}

@@ -80,10 +80,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text is required" });
       }
 
+      // PII Redaction for HIPAA compliance (same as voice notes)
+      const REDACTION_REGEXES: Array<[RegExp, string]> = [
+        [/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g, "[PHONE]"],
+        [/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL]"],
+        [/\b\d{1,5}\s+[A-Za-z0-9.\-]+\s+(Street|St|Avenue|Ave|Road|Rd|Lane|Ln|Drive|Dr)\b/gi, "[ADDRESS]"],
+        [/\b(Sponsor|Therapist|Doctor|Case\s*Manager)\s*:\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/g, "[REDACTED_NAME]"],
+        [/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, "[DATE]"], // Date patterns
+        [/\b\d{4}-\d{2}-\d{2}\b/g, "[DATE]"], // ISO date patterns
+        [/\b[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?=\s*(?:DOB|Born|Birth))/gi, "[PATIENT_NAME]"],
+      ];
+
+      const redactPII = (text: string): string => {
+        let out = text;
+        for (const [rx, repl] of REDACTION_REGEXES) out = out.replace(rx, repl);
+        return out;
+      };
+
+      const redactedText = redactPII(text);
+
       if (!process.env.OPENAI_API_KEY) {
         // Fallback to keyword classification if no AI key
         const classifyModule = await import('./classify-keywords.js');
-        const result = classifyModule.classifyDocumentByKeywords(text);
+        const result = classifyModule.classifyDocumentByKeywords(redactedText);
         return res.json(result);
       }
 
@@ -96,11 +115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           {
             role: "system",
-            content: "You are an expert at classifying sober living facility documents. Classify the document as either 'commitment' (goals, pledges, recovery plans, AA/NA step work) or 'writeup' (incidents, violations, warnings, disciplinary actions). Respond with JSON: {label: 'commitment' or 'writeup', confidence: 0-1}"
+            content: "You are an expert at classifying sober living facility documents. Classify the document as either 'commitment' (goals, pledges, recovery plans, AA/NA step work) or 'writeup' (incidents, violations, warnings, disciplinary actions). Note: Text may contain [PHONE], [EMAIL], [ADDRESS], [DATE], and [REDACTED_NAME] placeholders for privacy. Respond with JSON: {label: 'commitment' or 'writeup', confidence: 0-1}"
           },
           {
             role: "user",
-            content: text
+            content: redactedText
           }
         ],
         response_format: { type: "json_object" },
