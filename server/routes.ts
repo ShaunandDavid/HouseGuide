@@ -1315,11 +1315,15 @@ Break this down into categorized segments that will be useful for weekly reports
 
   app.post("/api/reports/weekly", requireAuth, async (req: any, res) => {
     try {
-      const validatedData = insertWeeklyReportSchema.parse(req.body);
+      // First add the required fields from authenticated context
+      const reportData = {
+        ...req.body,
+        houseId: req.guide.houseId!,
+        createdBy: req.guide.id
+      };
       
-      // Ensure report is scoped to guide's house and include audit trail
-      validatedData.houseId = req.guide.houseId!;
-      validatedData.createdBy = req.guide.id;
+      // Then validate the complete data
+      const validatedData = insertWeeklyReportSchema.parse(reportData);
       
       const report = await storage.createWeeklyReport(validatedData);
       res.status(201).json(report);

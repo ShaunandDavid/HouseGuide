@@ -49,32 +49,49 @@ export function DocumentScanModal({
       const result = await processImageWithOCR(file, setOcrProgress);
       setOcrResult(result.text);
       
-      // Try AI classification first, fallback to keywords
-      try {
-        const response = await fetch('/api/classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: result.text })
-        });
-        
-        if (response.ok) {
-          const aiResult = await response.json();
-          setClassification(aiResult);
-        } else {
+      // Only proceed with classification if we have text
+      if (result.text && result.text.trim()) {
+        // Try AI classification first, fallback to keywords
+        try {
+          const response = await fetch('/api/classify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: result.text })
+          });
+          
+          if (response.ok) {
+            const aiResult = await response.json();
+            setClassification(aiResult);
+          } else {
+            // Fallback to keyword classification
+            const classificationResult = classifyDocumentByKeywords(result.text);
+            setClassification(classificationResult);
+          }
+        } catch (error) {
+          console.warn('Classification failed, using keyword fallback:', error);
           // Fallback to keyword classification
           const classificationResult = classifyDocumentByKeywords(result.text);
           setClassification(classificationResult);
         }
-      } catch (error) {
-        // Fallback to keyword classification
-        const classificationResult = classifyDocumentByKeywords(result.text);
-        setClassification(classificationResult);
+      } else {
+        // No text found, but allow saving as general document
+        setClassification({ label: null, confidence: 0 });
+        toast({
+          title: "No Text Found",
+          description: "Document processed but no text was detected. You can still save it as a general document.",
+          variant: "default"
+        });
       }
     } catch (error) {
-      // OCR processing failed - handled in UI
+      console.error('OCR processing error:', error);
+      // Clear any partial state and show user-friendly message
+      setOcrResult('');
+      setClassification(null);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process the image';
       toast({
-        title: "OCR Processing Failed",
-        description: "Failed to process the image. Please try again.",
+        title: "Processing Failed",
+        description: `${errorMessage}. Please try a different image or retake the photo.`,
         variant: "destructive"
       });
     } finally {
@@ -344,7 +361,7 @@ export function DocumentScanModal({
                 <Button 
                   className="flex-1" 
                   onClick={handleSaveDocument}
-                  disabled={isProcessing || !ocrResult}
+                  disabled={isProcessing}
                   data-testid="save-document-button"
                 >
                   Save Document
