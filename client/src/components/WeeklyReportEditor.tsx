@@ -81,11 +81,11 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
 
   // Save report mutation
   const saveMutation = useMutation({
-    mutationFn: (data: { title: string; content: string; weekStart: string; weekEnd: string }) =>
+    mutationFn: (data: { title: string; body: string; weekStart: string; weekEnd: string; residentId: string }) =>
       createWeeklyReport({
-        residentId: resident.id,
+        residentId: data.residentId,
         title: data.title,
-        content: data.content,
+        body: data.body,
         weekStart: data.weekStart,
         weekEnd: data.weekEnd,
       }),
@@ -133,8 +133,9 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
 
     const title = `Weekly Report - ${resident.firstName} ${resident.lastInitial} (${weekStart} to ${weekEnd})`;
     saveMutation.mutate({
+      residentId: resident.id,
       title,
-      content: reportText,
+      body: reportText,
       weekStart,
       weekEnd,
     });
