@@ -99,7 +99,7 @@ export const insertNoteSchema = z.object({
   residentId: z.string(),
   houseId: z.string(),
   text: z.string().max(65536),
-  source: z.enum(["manual", "ocr", "smart_ocr"]).default("manual"),
+  source: z.enum(["manual", "ocr", "smart_ocr", "voice"]).default("manual"),
   linkedFileId: z.string().optional(), // Links to OCR source file
   category: z.enum(CATEGORY_VALUES).default("general").optional(),
   createdBy: z.string(),
@@ -112,7 +112,7 @@ export interface Note {
   residentId: string;
   houseId: string;
   text: string;
-  source: "manual" | "ocr" | "smart_ocr";
+  source: "manual" | "ocr" | "smart_ocr" | "voice";
   linkedFileId?: string;
   category?: "work_school" | "demeanor" | "sponsor" | "medical" | "chores" | "general";
   createdBy: string;

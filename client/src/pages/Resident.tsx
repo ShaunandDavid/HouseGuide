@@ -9,6 +9,7 @@ import { DocumentScanModal } from "@/components/DocumentScanModal";
 import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
 import { StatusManagementModal } from "@/components/StatusManagementModal";
 import { QuickNoteModal } from "@/components/QuickNoteModal";
+import { ComprehensiveVoiceNote } from "@/components/ComprehensiveVoiceNote";
 import { 
   ArrowLeft, 
   User, 
@@ -16,7 +17,8 @@ import {
   FileText, 
   Users, 
   AlertTriangle,
-  Wand2
+  Wand2,
+  Mic
 } from "lucide-react";
 import { getResident, getFilesByResident } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +36,7 @@ export default function ResidentPage() {
   const [showReportEditor, setShowReportEditor] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
+  const [showVoiceNoteModal, setShowVoiceNoteModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -190,7 +193,7 @@ export default function ResidentPage() {
         {/* Quick Actions */}
         <section>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Card 
               className="hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => setShowScanModal(true)}
@@ -216,6 +219,20 @@ export default function ResidentPage() {
                 </div>
                 <h4 className="font-medium text-gray-900 mb-1">Add Note</h4>
                 <p className="text-sm text-gray-600">Quick text note</p>
+              </CardContent>
+            </Card>
+            
+            <Card 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setShowVoiceNoteModal(true)}
+              data-testid="voice-note-action"
+            >
+              <CardContent className="p-4">
+                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
+                  <Mic className="w-4 h-4 text-purple-600" />
+                </div>
+                <h4 className="font-medium text-gray-900 mb-1">Voice Note</h4>
+                <p className="text-sm text-gray-600">AI categorized recording</p>
               </CardContent>
             </Card>
           </div>
@@ -316,6 +333,13 @@ export default function ResidentPage() {
       <QuickNoteModal
         isOpen={showQuickNoteModal}
         onClose={() => setShowQuickNoteModal(false)}
+        residentId={resident.id}
+      />
+
+      {/* Comprehensive Voice Note Modal */}
+      <ComprehensiveVoiceNote
+        isOpen={showVoiceNoteModal}
+        onClose={() => setShowVoiceNoteModal(false)}
         residentId={resident.id}
       />
 
