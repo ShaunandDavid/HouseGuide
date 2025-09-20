@@ -122,7 +122,7 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
 
     try {
       // Call AI categorization endpoint
-      const response = await apiRequest('/notes/categorize-voice', {
+      const response = await apiRequest('/api/notes/categorize-voice', {
         method: 'POST',
         body: JSON.stringify({
           transcript: transcript.trim(),
