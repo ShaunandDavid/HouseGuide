@@ -1138,27 +1138,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch notes" });
     }
   });
+  // AI-powered note classification helper
+  const classifyNoteText = async (text: string): Promise<string> => {
+    // Fast keyword matching first (free, instant)
+    const lowerText = text.toLowerCase();
+    const keywords: Record<string, string[]> = {
+      sponsor: ['sponsor', 'step work', 'big book', 'aa', 'na', 'meeting', 'recovery'],
+      work_school: ['job', 'work', 'interview', 'school', 'class', 'shift', 'employed', 'hired'],
+      medical: ['doctor', 'appointment', 'medication', 'meds', 'therapy', 'counseling', 'psychiatrist'],
+      chores: ['chore', 'clean', 'dishes', 'laundry', 'room', 'trash', 'kitchen', 'bathroom'],
+      demeanor: ['attitude', 'mood', 'positive', 'negative', 'anxious', 'happy', 'upset', 'behavior'],
+    };
+
+    for (const [category, words] of Object.entries(keywords)) {
+      if (words.some(word => lowerText.includes(word))) {
+        return category;
+      }
+    }
+
+    // AI fallback for ambiguous notes (only if OPENAI_API_KEY configured)
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const { OpenAI } = await import("openai");
+        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{
+            role: "system",
+            content: "Classify this sober living resident note into ONE category: work_school, demeanor, sponsor, medical, chores, or general. Reply with ONLY the category name."
+          }, {
+            role: "user", 
+            content: text
+          }],
+          temperature: 0,
+          max_tokens: 20
+        });
+
+        const result = completion.choices[0]?.message?.content?.toLowerCase().trim() || 'general';
+        const validCategories = ['work_school', 'demeanor', 'sponsor', 'medical', 'chores', 'general'];
+        return validCategories.includes(result) ? result : 'general';
+      } catch (e) {
+        console.error('AI classification failed, using general:', e);
+        return 'general';
+      }
+    }
+
+    return 'general';
+  };
 
   app.post("/api/notes", requireAuth, async (req: any, res) => {
     try {
-      // Add houseId and createdBy before validation
+      // Auto-classify if no category provided or category is "general"
+      let category = req.body.category;
+      if (!category || category === 'general') {
+        category = await classifyNoteText(req.body.text || '');
+      }
+
       const noteData = {
         ...req.body,
+        category,
         houseId: req.guide.houseId!,
         createdBy: req.guide.id
       };
-      
-      // Debug logging removed for production security and compliance
-      
+
       const validatedData = insertNoteSchema.parse(noteData);
       const note = await storage.createNote(validatedData);
-      
+
       res.status(201).json(note);
     } catch (error) {
       console.error('Create note error:', error);
       res.status(500).json({ error: "Failed to create note" });
     }
   });
+
 
   // Voice Note Categorization (AI-powered)
   app.post("/api/notes/categorize-voice", requireAuth, async (req: any, res) => {
