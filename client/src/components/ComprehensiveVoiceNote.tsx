@@ -13,6 +13,8 @@ import { createNote, apiRequest } from "@/lib/api";
 import type { InsertNote } from "@shared/schema";
 import type { Category } from "@shared/categories";
 
+const MIN_SEGMENT_CONFIDENCE = 0.6;
+
 interface ComprehensiveVoiceNoteProps {
   isOpen: boolean;
   onClose: () => void;
@@ -131,12 +133,25 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
       });
 
       const result: AICategorizationResult = response;
-      setCategorizedSegments(result.segments);
+      const lowConfidenceCount = result.segments.filter(segment => segment.confidence < MIN_SEGMENT_CONFIDENCE).length;
+      const normalizedSegments = result.segments.map(segment => {
+        if (segment.confidence >= MIN_SEGMENT_CONFIDENCE) {
+          return segment;
+        }
+        return {
+          ...segment,
+          category: "general",
+          reason: "Low confidence; saved as General."
+        };
+      });
+      setCategorizedSegments(normalizedSegments);
       setProcessingStep('complete');
 
       toast({
         title: "Voice Note Processed",
-        description: `Found ${result.segments.length} categorized segments from your recording.`,
+        description: lowConfidenceCount > 0
+          ? `Found ${normalizedSegments.length} segments. ${lowConfidenceCount} low-confidence segment(s) saved as General.`
+          : `Found ${normalizedSegments.length} categorized segments from your recording.`,
       });
     } catch (error) {
       console.error('Failed to process voice note:', error);

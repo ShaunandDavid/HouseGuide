@@ -28,7 +28,7 @@ export type Entry = {
   category?: "work_school" | "demeanor" | "sponsor" | "medical" | "chores" | "general";
 };
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-3.5-turbo"; // use "gpt-5" if enabled in your env
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini"; // override with OPENAI_MODEL if needed
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /** ---------------- HIPAA-Forward utilities ---------------- **/
@@ -344,7 +344,7 @@ export async function generateWeeklyReport(
   entries: Entry[],
 ) {
   console.info("[REPORT] Starting weekly report generation");
-  console.info("[REPORT] Model:", process.env.OPENAI_MODEL ?? "gpt-3.5-turbo");
+  console.info("[REPORT] Model:", process.env.OPENAI_MODEL ?? "gpt-4o-mini");
   console.info("[REPORT] Total entries:", entries.length);
   
   const sanitized = redactEntries(entries);

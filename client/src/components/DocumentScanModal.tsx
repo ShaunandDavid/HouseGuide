@@ -11,6 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/api";
 import { autoPopulateTrackers } from "@/lib/auto-populate";
 
+const MIN_OCR_CONFIDENCE = 60;
+const MIN_OCR_TEXT_CHARS = 40;
+const MIN_SEGMENT_CONFIDENCE = 0.6;
+
 interface DocumentScanModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -30,6 +34,7 @@ export function DocumentScanModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState<string>('');
+  const [isLowQualityOCR, setIsLowQualityOCR] = useState(false);
   const [classification, setClassification] = useState<{
     label: 'commitment' | 'writeup' | null;
     confidence: number;
@@ -43,20 +48,25 @@ export function DocumentScanModal({
     setIsProcessing(true);
     setOcrProgress(0);
     setOcrResult('');
+    setIsLowQualityOCR(false);
     setClassification(null);
 
     try {
       const result = await processImageWithOCR(file, setOcrProgress);
-      setOcrResult(result.text);
+      const cleanedText = result.text?.trim() || '';
+      const isLowQuality = cleanedText.length > 0 && (result.confidence < MIN_OCR_CONFIDENCE || cleanedText.length < MIN_OCR_TEXT_CHARS);
+
+      setOcrResult(cleanedText);
+      setIsLowQualityOCR(isLowQuality);
       
       // Only proceed with classification if we have text
-      if (result.text && result.text.trim()) {
+      if (cleanedText && !isLowQuality) {
         // Try AI classification first, fallback to keywords
         try {
           const response = await fetch('/api/classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: result.text })
+            body: JSON.stringify({ text: cleanedText })
           });
           
           if (response.ok) {
@@ -70,9 +80,16 @@ export function DocumentScanModal({
         } catch (error) {
           console.warn('Classification failed, using keyword fallback:', error);
           // Fallback to keyword classification
-          const classificationResult = classifyDocumentByKeywords(result.text);
+          const classificationResult = classifyDocumentByKeywords(cleanedText);
           setClassification(classificationResult);
         }
+      } else if (cleanedText) {
+        setClassification({ label: null, confidence: 0 });
+        toast({
+          title: "OCR Quality Too Low",
+          description: "We could not reliably read this image. You can still save the file, but no notes will be created. Consider re-scanning.",
+          variant: "default"
+        });
       } else {
         // No text found, but allow saving as general document
         setClassification({ label: null, confidence: 0 });
@@ -141,7 +158,7 @@ export function DocumentScanModal({
       const fileRecord = uploadResult.file;
       
       // Create linked note with OCR text if there is text
-      if (ocrResult && ocrResult.trim()) {
+      if (ocrResult && ocrResult.trim() && !isLowQualityOCR) {
         // First create the main OCR note (uncategorized)
         await createNote({
           residentId,
@@ -166,9 +183,21 @@ export function DocumentScanModal({
 
           if (categorizeResponse.ok) {
             const categorizationResult = await categorizeResponse.json();
+            const segments = categorizationResult.segments || [];
+            const lowConfidenceCount = segments.filter((segment: any) => segment.confidence < MIN_SEGMENT_CONFIDENCE).length;
+            const normalizedSegments = segments.map((segment: any) => {
+              if (segment.confidence >= MIN_SEGMENT_CONFIDENCE) {
+                return segment;
+              }
+              return {
+                ...segment,
+                category: 'general',
+                reason: 'Low confidence; saved as General.'
+              };
+            });
             
             // Create individual categorized notes for each segment
-            const categorizedNotes = categorizationResult.segments.map((segment: any) => 
+            const categorizedNotes = normalizedSegments.map((segment: any) => 
               createNote({
                 residentId,
                 houseId,
@@ -184,7 +213,9 @@ export function DocumentScanModal({
 
             toast({
               title: "OCR Content Categorized",
-              description: `Created ${categorizationResult.segments.length} categorized notes from OCR text for weekly reports.`,
+              description: lowConfidenceCount > 0
+                ? `Created ${normalizedSegments.length} notes. ${lowConfidenceCount} low-confidence segment(s) saved as General.`
+                : `Created ${normalizedSegments.length} categorized notes from OCR text for weekly reports.`,
             });
           } else {
             // Fallback to auto-populate if categorization fails
@@ -225,6 +256,12 @@ export function DocumentScanModal({
           }
         }
       }
+      if (ocrResult && ocrResult.trim() && isLowQualityOCR) {
+        toast({
+          title: "OCR Skipped",
+          description: "Image saved, but OCR text was too low quality to create notes. Consider re-scanning or adding a manual note.",
+        });
+      }
       
       toast({
         title: "Document Saved",
@@ -248,6 +285,7 @@ export function DocumentScanModal({
     setIsProcessing(false);
     setOcrProgress(0);
     setOcrResult('');
+    setIsLowQualityOCR(false);
     setClassification(null);
     onClose();
   };
@@ -255,6 +293,7 @@ export function DocumentScanModal({
   const handleRetake = () => {
     setSelectedFile(null);
     setOcrResult('');
+    setIsLowQualityOCR(false);
     setClassification(null);
     setIsProcessing(false);
   };
@@ -328,12 +367,22 @@ export function DocumentScanModal({
             <div className="p-3 bg-surface-50 rounded-lg" data-testid="classification-results">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-700">Auto-Classification</span>
-                <Badge 
+                <Badge
                   variant="secondary"
-                  className={classification.label === 'commitment' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}
+                  className={
+                    classification.label === 'commitment'
+                      ? 'bg-green-100 text-green-800'
+                      : classification.label === 'writeup'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-gray-100 text-gray-800'
+                  }
                   data-testid="classification-badge"
                 >
-                  {classification.label === 'commitment' ? 'Commitment' : 'Write-up'}
+                  {classification.label === 'commitment'
+                    ? 'Commitment'
+                    : classification.label === 'writeup'
+                      ? 'Write-up'
+                      : 'Needs Review'}
                 </Badge>
               </div>
               <p className="text-xs text-gray-600 mb-2" data-testid="confidence-score">

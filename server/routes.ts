@@ -21,6 +21,18 @@ import {
   ObjectNotFoundError,
 } from "./objectStorage";
 
+const readEnvNumber = (key: string, fallback: number) => {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const MIN_CLASSIFY_TEXT_CHARS = Math.max(0, Math.floor(readEnvNumber("MIN_CLASSIFY_TEXT_CHARS", 40)));
+const MIN_NOTE_TEXT_CHARS = Math.max(0, Math.floor(readEnvNumber("MIN_NOTE_TEXT_CHARS", 20)));
+const MIN_NOTE_CONFIDENCE = Math.min(1, Math.max(0, readEnvNumber("MIN_NOTE_CONFIDENCE", 0.6)));
+const MIN_SEGMENT_CONFIDENCE = Math.min(1, Math.max(0, readEnvNumber("MIN_SEGMENT_CONFIDENCE", 0.6)));
+
 // Authentication middleware
 async function requireAuth(req: any, res: any, next: any) {
   const token = req.cookies?.authToken;
@@ -99,6 +111,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const redactedText = redactPII(text);
 
+      if (redactedText.trim().length < MIN_CLASSIFY_TEXT_CHARS) {
+        return res.json({ label: null, confidence: 0 });
+      }
+
       if (!process.env.OPENAI_API_KEY) {
         // Fallback to keyword classification if no AI key
         const classifyModule = await import('./classify-keywords.js');
@@ -111,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -1140,8 +1156,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   // AI-powered note classification helper
   const classifyNoteText = async (text: string): Promise<string> => {
+    const trimmedText = text.trim();
+    if (!trimmedText) {
+      return 'general';
+    }
+
     // Fast keyword matching first (free, instant)
-    const lowerText = text.toLowerCase();
+    const lowerText = trimmedText.toLowerCase();
     const keywords: Record<string, string[]> = {
       sponsor: ['sponsor', 'step work', 'big book', 'aa', 'na', 'meeting', 'recovery'],
       work_school: ['job', 'work', 'interview', 'school', 'class', 'shift', 'employed', 'hired'],
@@ -1156,6 +1177,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    if (trimmedText.length < MIN_NOTE_TEXT_CHARS) {
+      return 'general';
+    }
+
     // AI fallback for ambiguous notes (only if OPENAI_API_KEY configured)
     if (process.env.OPENAI_API_KEY) {
       try {
@@ -1163,21 +1188,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
         const completion = await client.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
           messages: [{
             role: "system",
-            content: "Classify this sober living resident note into ONE category: work_school, demeanor, sponsor, medical, chores, or general. Reply with ONLY the category name."
+            content: "Classify this sober living resident note into ONE category: work_school, demeanor, sponsor, medical, chores, or general. Respond ONLY with JSON: {\"category\":\"...\",\"confidence\":0-1}. Be conservative; if unsure, set confidence <= 0.5."
           }, {
             role: "user", 
-            content: text
+            content: trimmedText
           }],
           temperature: 0,
-          max_tokens: 20
+          max_tokens: 60,
+          response_format: { type: "json_object" }
         });
 
-        const result = completion.choices[0]?.message?.content?.toLowerCase().trim() || 'general';
+        const raw = completion.choices[0]?.message?.content || '{}';
+        const parsed = JSON.parse(raw);
+        const result = String(parsed.category || 'general').toLowerCase().trim();
+        const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0;
         const validCategories = ['work_school', 'demeanor', 'sponsor', 'medical', 'chores', 'general'];
-        return validCategories.includes(result) ? result : 'general';
+        if (!validCategories.includes(result)) {
+          return 'general';
+        }
+        return confidence >= MIN_NOTE_CONFIDENCE ? result : 'general';
       } catch (e) {
         console.error('AI classification failed, using general:', e);
         return 'general';
@@ -1271,7 +1303,7 @@ Return valid JSON only.`;
 Break this down into categorized segments that will be useful for weekly reports and case management.`;
 
       const completion = await client.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -1287,9 +1319,32 @@ Break this down into categorized segments that will be useful for weekly reports
       }
 
       const aiResponse = JSON.parse(responseText);
+
+      const validCategories = ['work_school', 'demeanor', 'sponsor', 'medical', 'chores', 'general'];
+      const rawSegments = Array.isArray(aiResponse.segments) ? aiResponse.segments : [];
+      const normalizedSegments = rawSegments.map((segment: any) => {
+        const confidence = typeof segment.confidence === 'number' ? segment.confidence : 0;
+        const category = String(segment.category || 'general').toLowerCase().trim();
+        const reason = typeof segment.reason === 'string' ? segment.reason : 'AI classification';
+        const safeCategory = validCategories.includes(category) ? category : 'general';
+        if (confidence < MIN_SEGMENT_CONFIDENCE) {
+          return {
+            ...segment,
+            category: 'general',
+            confidence,
+            reason: 'Low confidence; saved as General.'
+          };
+        }
+        return {
+          ...segment,
+          category: safeCategory,
+          confidence,
+          reason
+        };
+      });
       
       const result = {
-        segments: aiResponse.segments || [],
+        segments: normalizedSegments,
         fullTranscript: transcript,
         summary: aiResponse.summary || "Voice note processed successfully"
       };
@@ -1331,8 +1386,19 @@ Break this down into categorized segments that will be useful for weekly reports
           };
         }).filter((segment: any) => segment.text.length > 10);
 
+        const normalizedSegments = segments.map((segment: any) => {
+          if (segment.confidence < MIN_SEGMENT_CONFIDENCE) {
+            return {
+              ...segment,
+              category: 'general',
+              reason: 'Low confidence; saved as General.'
+            };
+          }
+          return segment;
+        });
+
         const fallbackResult = {
-          segments,
+          segments: normalizedSegments,
           fullTranscript: transcript,
           summary: "Voice note categorized using keyword fallback system"
         };
@@ -1705,7 +1771,7 @@ Provide:
 Keep it professional, concise, and actionable. Focus on insights that help facility management.`;
           
           const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
             messages: [
               {
                 role: "system",

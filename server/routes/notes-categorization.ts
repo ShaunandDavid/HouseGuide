@@ -6,6 +6,14 @@ import { z } from "zod";
 
 const router = Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const readEnvNumber = (key: string, fallback: number) => {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const MIN_SEGMENT_CONFIDENCE = Math.min(1, Math.max(0, readEnvNumber("MIN_SEGMENT_CONFIDENCE", 0.6)));
 
 // PII Redaction for HIPAA compliance
 const REDACTION_REGEXES: Array<[RegExp, string]> = [
@@ -24,7 +32,7 @@ function redactPII(text: string): string {
 // AI Response Schema
 const CategorizedSegment = z.object({
   text: z.string(),
-  category: z.enum(["work_school", "demeanor", "sponsor", "medical", "chores"]),
+  category: z.enum(["work_school", "demeanor", "sponsor", "medical", "chores", "general"]),
   confidence: z.number().min(0).max(1),
   reason: z.string()
 });
@@ -76,7 +84,7 @@ Return valid JSON only.`;
 Break this down into categorized segments that will be useful for weekly reports and case management.`;
 
     const completion = await client.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -94,10 +102,20 @@ Break this down into categorized segments that will be useful for weekly reports
     // Parse and validate AI response
     const aiResponse = JSON.parse(responseText);
     const validatedResponse = CategorizationResponse.parse(aiResponse);
+    const normalizedSegments = validatedResponse.segments.map(segment => {
+      if (segment.confidence < MIN_SEGMENT_CONFIDENCE) {
+        return {
+          ...segment,
+          category: "general",
+          reason: "Low confidence; saved as General."
+        };
+      }
+      return segment;
+    });
 
     // Prepare response
     const result = {
-      segments: validatedResponse.segments,
+      segments: normalizedSegments,
       fullTranscript: transcript, // Original transcript for display
       summary: validatedResponse.summary
     };
@@ -148,8 +166,19 @@ function fallbackCategorization(transcript: string) {
     };
   }).filter(segment => segment.text.length > 10);
 
+  const normalizedSegments = segments.map(segment => {
+    if (segment.confidence < MIN_SEGMENT_CONFIDENCE) {
+      return {
+        ...segment,
+        category: "general",
+        reason: "Low confidence; saved as General."
+      };
+    }
+    return segment;
+  });
+
   return {
-    segments,
+    segments: normalizedSegments,
     fullTranscript: transcript,
     summary: "Voice note categorized using keyword fallback system"
   };
