@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MicInput } from "@/components/MicInput";
 import { ArrowLeft, Plus, Users, Calendar, Clock, MapPin, Camera, Image } from "lucide-react";
 import { getResident, getMeetingsByResident, createMeeting, updateMeeting, deleteMeeting, getCurrentUser, apiRequest } from "@/lib/api";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -25,6 +26,7 @@ export default function MeetingTracker() {
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const notesTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -70,7 +72,7 @@ export default function MeetingTracker() {
   };
 
   const handleGoBack = () => {
-    setLocation(`/resident/${id}/trackers`);
+    setLocation(`/resident/${id}/dashboard`);
   };
 
   const resetForm = () => {
@@ -465,14 +467,40 @@ export default function MeetingTracker() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="notes" className="text-sm font-medium">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Additional notes (optional)"
-                rows={3}
-                className="min-h-[80px] touch-manipulation"
-              />
+              <div className="relative">
+                <Textarea
+                  ref={notesTextareaRef}
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Additional notes (optional)"
+                  rows={3}
+                  className="min-h-[80px] pr-12 touch-manipulation"
+                />
+                <div className="absolute top-2 right-2">
+                  <MicInput
+                    targetRef={notesTextareaRef}
+                    onInsertText={(text, cursorPosition) => {
+                      if (notesTextareaRef.current) {
+                        const textarea = notesTextareaRef.current;
+                        const currentValue = textarea.value;
+                        const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                        
+                        const newValue = 
+                          currentValue.slice(0, insertPosition) + 
+                          (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                          text + 
+                          (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                          currentValue.slice(insertPosition);
+                        
+                        setFormData(prev => ({ ...prev, notes: newValue }));
+                      }
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-2">

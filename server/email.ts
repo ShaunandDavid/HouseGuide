@@ -1,11 +1,15 @@
 import { MailService } from '@sendgrid/mail';
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY environment variable must be set");
-}
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
+const isEmailConfigured = Boolean(SENDGRID_API_KEY && SENDGRID_FROM_EMAIL);
 
 const mailService = new MailService();
-mailService.setApiKey(process.env.SENDGRID_API_KEY);
+if (SENDGRID_API_KEY) {
+  mailService.setApiKey(SENDGRID_API_KEY);
+} else {
+  console.warn('SendGrid API key is not configured. Verification emails will not send.');
+}
 
 interface EmailParams {
   to: string;
@@ -16,6 +20,11 @@ interface EmailParams {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  if (!isEmailConfigured) {
+    console.error('Email service not configured. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL.');
+    return false;
+  }
+
   try {
     await mailService.send({
       to: params.to,
@@ -38,7 +47,7 @@ export function generateVerificationEmail(email: string, token: string, houseNam
   const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
   
   // Using a verified sender email - you'll need to update this with your verified SendGrid sender
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com';
+  const fromEmail = SENDGRID_FROM_EMAIL || 'noreply@example.com';
   
   return {
     to: email,

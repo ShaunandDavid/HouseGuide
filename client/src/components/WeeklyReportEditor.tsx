@@ -175,7 +175,7 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
           </Alert>
 
           {/* Date Selection */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="week-start">Week Start</Label>
               <Input
@@ -215,12 +215,13 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
                 <CardTitle className="text-sm">Data Used for Generation</CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-2">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>Goals: {generationData.data.goals.length}</div>
                   <div>Chores: {generationData.data.chores.length}</div>
                   <div>Accomplishments: {generationData.data.accomplishments.length}</div>
                   <div>Incidents: {generationData.data.incidents.length}</div>
                   <div>Meetings: {generationData.data.meetings.length}</div>
+                  <div>Fees: {generationData.data.programFees.length}</div>
                   <div>Notes: {generationData.data.notes.length}</div>
                 </div>
               </CardContent>
@@ -265,7 +266,7 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
                 value={reportText}
                 onChange={(e) => setReportText(e.target.value)}
                 rows={20}
-                className="font-mono text-sm pr-12"
+                className="font-mono text-xs sm:text-sm pr-12"
                 data-testid="textarea-report-content"
               />
               <div className="absolute top-2 right-2">

@@ -323,6 +323,21 @@ export async function createNote(data: InsertNote): Promise<Note> {
   });
 }
 
+export async function transcribeVoiceNote(formData: FormData): Promise<any> {
+  const response = await fetch(`${API_BASE}/notes/voice-note`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function getNotesByResident(residentId: string): Promise<Note[]> {
   return apiRequest(`/notes/by-resident/${residentId}`);
 }

@@ -100,6 +100,12 @@
   }
 }
 
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* Custom utility classes */
 .bg-surface-50 {
   background-color: var(--surface-50);

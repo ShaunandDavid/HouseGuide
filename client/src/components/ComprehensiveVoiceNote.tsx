@@ -5,11 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import { Mic, MicOff, Square, Loader2, Wand2, Save } from "lucide-react";
-import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { Mic, Square, Loader2, Wand2, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createNote, apiRequest } from "@/lib/api";
+import { createNote, transcribeVoiceNote } from "@/lib/api";
 import type { InsertNote } from "@shared/schema";
 import type { Category } from "@shared/categories";
 
@@ -43,128 +41,194 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   
-  const recordingTimer = useRef<NodeJS.Timeout>();
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const discardRecordingRef = useRef(false);
   const durationTimer = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { isListening, isSupported, startListening, stopListening, resetTranscript } = useSpeechRecognition({
-    continuous: true,
-    interimResults: true,
-    lang: 'en-US',
-    onResult: (text, isFinal) => {
-      if (isFinal) {
-        setTranscript(prev => prev + ' ' + text);
-      }
-    },
-    onError: (error) => {
-      console.error('Speech recognition error:', error);
-      setIsRecording(false);
-      toast({
-        title: "Recording Error",
-        description: "Voice recording failed. Please try again.",
-        variant: "destructive",
-      });
+  const isRecorderSupported = typeof window !== 'undefined'
+    && typeof MediaRecorder !== 'undefined'
+    && !!navigator?.mediaDevices?.getUserMedia;
+
+  const getSupportedMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') return '';
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/m4a',
+      'audio/aac',
+      'audio/mpeg',
+      'audio/ogg;codecs=opus',
+      'audio/ogg'
+    ];
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  };
+
+  const getAudioExtension = (mimeType: string) => {
+    if (mimeType.includes('webm')) return '.webm';
+    if (mimeType.includes('ogg')) return '.ogg';
+    if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return '.mp3';
+    if (mimeType.includes('mp4') || mimeType.includes('m4a')) return '.m4a';
+    if (mimeType.includes('aac')) return '.aac';
+    if (mimeType.includes('wav')) return '.wav';
+    return '.webm';
+  };
+
+  const cleanupMedia = useCallback(() => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.onerror = null;
+      mediaRecorderRef.current = null;
     }
-  });
-
-  const startRecording = useCallback(() => {
-    if (!isSupported) {
-      toast({
-        title: "Voice Not Supported",
-        description: "Your browser doesn't support voice recording. Please type your notes instead.",
-        variant: "destructive",
-      });
-      return;
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
+    audioChunksRef.current = [];
+  }, []);
 
-    setIsRecording(true);
-    setTranscript('');
-    setRecordingDuration(0);
-    setCategorizedSegments([]);
-    setProcessingStep('recording');
-    resetTranscript();
-    startListening();
-
-    // Start duration timer
-    durationTimer.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
-
-    toast({
-      title: "Recording Started",
-      description: "Speak about all areas of the resident's recovery. Recording will automatically categorize your notes.",
-    });
-  }, [isSupported, startListening, resetTranscript, toast]);
-
-  const stopRecording = useCallback(() => {
-    setIsRecording(false);
-    stopListening();
-    
-    if (durationTimer.current) {
-      clearInterval(durationTimer.current);
-    }
-
-    if (transcript.trim()) {
-      processVoiceNote();
-    } else {
-      toast({
-        title: "No Speech Detected",
-        description: "Please try recording again and speak clearly.",
-        variant: "destructive",
-      });
-    }
-  }, [stopListening, transcript]);
-
-  const processVoiceNote = async () => {
-    if (!transcript.trim()) return;
-
+  const processVoiceNote = useCallback(async (audioBlob: Blob) => {
     setIsProcessing(true);
     setProcessingStep('categorizing');
 
     try {
-      // Call AI categorization endpoint
-      const response = await apiRequest('/api/notes/categorize-voice', {
-        method: 'POST',
-        body: JSON.stringify({
-          transcript: transcript.trim(),
-          residentId
-        })
-      });
+      const formData = new FormData();
+      const extension = getAudioExtension(audioBlob.type || '');
+      formData.append('audio', audioBlob, `voice-note${extension}`);
+      formData.append('residentId', residentId);
 
-      const result: AICategorizationResult = response;
-      const lowConfidenceCount = result.segments.filter(segment => segment.confidence < MIN_SEGMENT_CONFIDENCE).length;
-      const normalizedSegments = result.segments.map(segment => {
-        if (segment.confidence >= MIN_SEGMENT_CONFIDENCE) {
-          return segment;
-        }
-        return {
-          ...segment,
-          category: "general",
-          reason: "Low confidence; saved as General."
-        };
-      });
-      setCategorizedSegments(normalizedSegments);
+      const result: AICategorizationResult = await transcribeVoiceNote(formData);
+      const segments = Array.isArray(result.segments) ? result.segments : [];
+      const lowConfidenceCount = segments.filter(segment => segment.confidence < MIN_SEGMENT_CONFIDENCE).length;
+
+      setTranscript(result.fullTranscript || '');
+      setCategorizedSegments(segments);
       setProcessingStep('complete');
 
       toast({
         title: "Voice Note Processed",
         description: lowConfidenceCount > 0
-          ? `Found ${normalizedSegments.length} segments. ${lowConfidenceCount} low-confidence segment(s) saved as General.`
-          : `Found ${normalizedSegments.length} categorized segments from your recording.`,
+          ? `Found ${segments.length} segments. ${lowConfidenceCount} low-confidence segment(s) saved as General.`
+          : `Found ${segments.length} categorized segments from your recording.`,
       });
     } catch (error) {
       console.error('Failed to process voice note:', error);
       toast({
         title: "Processing Failed",
-        description: "Failed to categorize voice note. Please try again.",
+        description: "Failed to transcribe voice note. Please try again.",
         variant: "destructive",
       });
       setProcessingStep('recording');
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [getAudioExtension, residentId, toast]);
+
+  const startRecording = useCallback(async () => {
+    if (!isRecorderSupported) {
+      toast({
+        title: "Voice Not Supported",
+        description: "Your device does not support in-app voice recording.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    discardRecordingRef.current = false;
+    setTranscript('');
+    setRecordingDuration(0);
+    setCategorizedSegments([]);
+    setProcessingStep('recording');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const mimeType = getSupportedMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        cleanupMedia();
+        setIsRecording(false);
+        if (durationTimer.current) {
+          clearInterval(durationTimer.current);
+        }
+        toast({
+          title: "Recording Error",
+          description: "Voice recording failed. Please try again.",
+          variant: "destructive",
+        });
+      };
+
+      recorder.onstop = async () => {
+        const blobType = recorder.mimeType || (audioChunksRef.current[0] && audioChunksRef.current[0].type) || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+        cleanupMedia();
+
+        if (discardRecordingRef.current) {
+          discardRecordingRef.current = false;
+          return;
+        }
+
+        if (!audioBlob.size) {
+          setProcessingStep('recording');
+          toast({
+            title: "No Audio Captured",
+            description: "Please try recording again and speak clearly.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        await processVoiceNote(audioBlob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+
+      durationTimer.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+
+      toast({
+        title: "Recording Started",
+        description: "Speak clearly. Tap stop when finished.",
+      });
+    } catch (error) {
+      cleanupMedia();
+      toast({
+        title: "Microphone Unavailable",
+        description: "Unable to access microphone. Please check permissions.",
+        variant: "destructive",
+      });
+    }
+  }, [cleanupMedia, getSupportedMimeType, isRecorderSupported, processVoiceNote, toast]);
+
+  const stopRecording = useCallback(() => {
+    if (!mediaRecorderRef.current) return;
+
+    setIsRecording(false);
+    if (durationTimer.current) {
+      clearInterval(durationTimer.current);
+    }
+
+    if (mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
 
   const saveAllNotes = async () => {
     if (categorizedSegments.length === 0) return;
@@ -209,7 +273,10 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
 
   const handleClose = () => {
     if (isRecording) {
+      discardRecordingRef.current = true;
       stopRecording();
+    } else {
+      cleanupMedia();
     }
     if (durationTimer.current) {
       clearInterval(durationTimer.current);
@@ -284,12 +351,17 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
                 Record a comprehensive voice note covering all areas of the resident's recovery. 
                 AI will automatically categorize your content into the appropriate sections.
               </div>
+              {!isRecorderSupported && (
+                <div className="text-sm text-red-600">
+                  Voice recording is not supported on this device.
+                </div>
+              )}
               
               <div className="flex items-center gap-4">
                 {!isRecording ? (
                   <Button 
                     onClick={startRecording}
-                    disabled={isProcessing || processingStep !== 'recording'}
+                    disabled={!isRecorderSupported || isProcessing || processingStep !== 'recording'}
                     className="flex items-center gap-2"
                     data-testid="start-voice-recording"
                   >
@@ -318,14 +390,14 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
                 )}
               </div>
 
-              {transcript && (
+              {(transcript || isProcessing) && (
                 <div className="mt-4">
-                  <h4 className="font-medium mb-2">Live Transcript:</h4>
+                  <h4 className="font-medium mb-2">Transcript:</h4>
                   <Textarea
                     value={transcript}
                     readOnly
                     className="min-h-[100px]"
-                    placeholder="Your speech will appear here as you talk..."
+                    placeholder="Transcription will appear here after processing..."
                   />
                 </div>
               )}

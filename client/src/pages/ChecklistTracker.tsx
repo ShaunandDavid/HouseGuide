@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/ui/loading";
-import { ArrowLeft, Save, CheckSquare, User, Home, Book, Stethoscope, Briefcase } from "lucide-react";
+import { ArrowLeft, Save, CheckSquare, User, Users, Home, Book, ListChecks, Stethoscope, Briefcase } from "lucide-react";
 import { getResident, getChecklistByResident, createOrUpdateChecklist, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Checklist } from "@shared/schema";
@@ -25,6 +25,8 @@ export default function ChecklistTracker() {
     phase: '',
     homeGroup: '',
     stepWork: '',
+    sponsorMentor: '',
+    program: '',
     professionalHelp: '',
     job: ''
   });
@@ -51,6 +53,8 @@ export default function ChecklistTracker() {
             phase: checklistData.phase || '',
             homeGroup: checklistData.homeGroup || '',
             stepWork: checklistData.stepWork || '',
+            sponsorMentor: checklistData.sponsorMentor || '',
+            program: checklistData.program || '',
             professionalHelp: checklistData.professionalHelp || '',
             job: checklistData.job || ''
           });
@@ -60,6 +64,8 @@ export default function ChecklistTracker() {
             phase: '',
             homeGroup: '',
             stepWork: '',
+            sponsorMentor: '',
+            program: '',
             professionalHelp: '',
             job: ''
           });
@@ -71,6 +77,8 @@ export default function ChecklistTracker() {
           phase: '',
           homeGroup: '',
           stepWork: '',
+          sponsorMentor: '',
+          program: '',
           professionalHelp: '',
           job: ''
         });
@@ -88,7 +96,7 @@ export default function ChecklistTracker() {
   };
 
   const handleGoBack = () => {
-    setLocation(`/resident/${id}/trackers`);
+    setLocation(`/resident/${id}/dashboard`);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -233,6 +241,22 @@ export default function ChecklistTracker() {
             </CardContent>
           </Card>
 
+          {/* Sponsor/Mentor Section */}
+          <Card>
+            <CardContent className="p-6">
+              <Label className="flex items-center text-sm font-medium text-gray-700 mb-3">
+                <Users className="w-4 h-4 text-blue-500 mr-2" />
+                Sponsor / Mentor
+              </Label>
+              <Input
+                value={formData.sponsorMentor}
+                onChange={(e) => handleInputChange('sponsorMentor', e.target.value)}
+                placeholder="Sponsor name, contact, and check-in status..."
+                data-testid="input-sponsor-mentor"
+              />
+            </CardContent>
+          </Card>
+
           {/* Step Work Section */}
           <Card>
             <CardContent className="p-6">
@@ -243,9 +267,25 @@ export default function ChecklistTracker() {
               <Textarea
                 value={formData.stepWork}
                 onChange={(e) => handleInputChange('stepWork', e.target.value)}
-                placeholder="Current step work, sponsor relationship, progress notes..."
+                placeholder="Current step work progress and recovery notes..."
                 className="h-24"
                 data-testid="input-step-work"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Program Section */}
+          <Card>
+            <CardContent className="p-6">
+              <Label className="flex items-center text-sm font-medium text-gray-700 mb-3">
+                <ListChecks className="w-4 h-4 text-indigo-500 mr-2" />
+                Program
+              </Label>
+              <Input
+                value={formData.program}
+                onChange={(e) => handleInputChange('program', e.target.value)}
+                placeholder="IOP, outpatient, court program, MAT..."
+                data-testid="input-program"
               />
             </CardContent>
           </Card>

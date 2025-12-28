@@ -70,7 +70,7 @@ export default function GoalTracker() {
   };
 
   const handleGoBack = () => {
-    setLocation(`/resident/${id}/trackers`);
+    setLocation(`/resident/${id}/dashboard`);
   };
 
   const getStatusColor = (status: string) => {

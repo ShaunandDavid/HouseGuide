@@ -72,7 +72,7 @@ export default function IncidentTracker() {
   };
 
   const handleGoBack = () => {
-    setLocation(`/resident/${id}/trackers`);
+    setLocation(`/resident/${id}/dashboard`);
   };
 
   const resetForm = () => {

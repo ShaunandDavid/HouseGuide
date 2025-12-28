@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MicInput } from "@/components/MicInput";
 import { ArrowLeft, Plus, Home, Calendar, Clock } from "lucide-react";
 import { getResident, getChoresByResident, createChore, updateChore, deleteChore, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +25,7 @@ export default function ChoreTracker() {
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const notesTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -68,7 +70,7 @@ export default function ChoreTracker() {
   };
 
   const handleGoBack = () => {
-    setLocation(`/resident/${id}/trackers`);
+    setLocation(`/resident/${id}/dashboard`);
   };
 
   const resetForm = () => {
@@ -332,13 +334,40 @@ export default function ChoreTracker() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Enter additional notes"
-                rows={3}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={notesTextareaRef}
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Enter additional notes"
+                  rows={3}
+                  className="pr-12"
+                />
+                <div className="absolute top-2 right-2">
+                  <MicInput
+                    targetRef={notesTextareaRef}
+                    onInsertText={(text, cursorPosition) => {
+                      if (notesTextareaRef.current) {
+                        const textarea = notesTextareaRef.current;
+                        const currentValue = textarea.value;
+                        const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                        
+                        const newValue = 
+                          currentValue.slice(0, insertPosition) + 
+                          (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                          text + 
+                          (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                          currentValue.slice(insertPosition);
+                        
+                        setFormData(prev => ({ ...prev, notes: newValue }));
+                      }
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

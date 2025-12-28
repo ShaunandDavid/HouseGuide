@@ -119,72 +119,82 @@ export default function ResidentPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-50" data-testid="resident-page">
+    <div className="min-h-screen flex flex-col bg-surface-50 overflow-x-hidden" data-testid="resident-page">
       {/* Navigation Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleGoBack}
-              data-testid="back-button"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-              <User className="text-primary w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-lg font-semibold text-gray-900" data-testid="resident-name">
-                  {resident.firstName} {resident.lastInitial}.
-                </h2>
-                <Badge 
-                  variant={resident.status === 'active' ? 'default' : resident.status === 'graduated' ? 'secondary' : 'outline'}
-                  data-testid="resident-status"
-                >
-                  {resident.status || 'active'}
-                </Badge>
+        <div className="px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center space-x-3 min-w-0">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleGoBack}
+                data-testid="back-button"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <User className="text-primary w-5 h-5" />
               </div>
-              {resident.dischargeDate && (
-                <p className="text-sm text-gray-500" data-testid="discharge-info">
-                  Discharged: {new Date(resident.dischargeDate).toLocaleDateString()}
-                  {resident.dischargeReason && ` - ${resident.dischargeReason}`}
-                </p>
-              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1 min-w-0">
+                  <h2 className="text-lg font-semibold text-gray-900 truncate" data-testid="resident-name">
+                    {resident.firstName} {resident.lastInitial}.
+                  </h2>
+                  <Badge 
+                    variant={resident.status === 'active' ? 'default' : resident.status === 'graduated' ? 'secondary' : 'outline'}
+                    data-testid="resident-status"
+                    className="flex-shrink-0"
+                  >
+                    {resident.status || 'active'}
+                  </Badge>
+                </div>
+                {resident.dischargeDate && (
+                  <p className="text-sm text-gray-500 truncate" data-testid="discharge-info">
+                    Discharged: {new Date(resident.dischargeDate).toLocaleDateString()}
+                    {resident.dischargeReason && ` - ${resident.dischargeReason}`}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline"
-              onClick={() => setShowStatusModal(true)}
-              data-testid="manage-status-button"
-            >
-              Manage Status
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => setLocation(`/resident/${resident.id}/trackers`)}
-              data-testid="view-trackers-button"
-            >
-              View Trackers
-            </Button>
-            <Button 
-              variant="default"
-              onClick={() => setLocation(`/resident/${resident.id}/dashboard`)}
-              data-testid="open-dashboard-button"
-            >
-              Open Dashboard
-            </Button>
-            <Button 
-              onClick={() => setShowReportEditor(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
-              data-testid="generate-report-button"
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              Generate Report
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setShowStatusModal(true)}
+                className="h-9 px-3 text-xs sm:text-sm"
+                data-testid="manage-status-button"
+              >
+                <span className="sm:hidden">Status</span>
+                <span className="hidden sm:inline">Manage Status</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setLocation(`/resident/${resident.id}/trackers`)}
+                className="h-9 px-3 text-xs sm:text-sm"
+                data-testid="view-trackers-button"
+              >
+                <span className="sm:hidden">Trackers</span>
+                <span className="hidden sm:inline">View Trackers</span>
+              </Button>
+              <Button 
+                variant="default"
+                onClick={() => setLocation(`/resident/${resident.id}/dashboard`)}
+                className="h-9 px-3 text-xs sm:text-sm"
+                data-testid="open-dashboard-button"
+              >
+                <span className="sm:hidden">Dashboard</span>
+                <span className="hidden sm:inline">Open Dashboard</span>
+              </Button>
+              <Button 
+                onClick={() => setShowReportEditor(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white h-9 px-3 text-xs sm:text-sm"
+                data-testid="generate-report-button"
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                <span className="sm:hidden">Report</span>
+                <span className="hidden sm:inline">Generate Report</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -193,7 +203,7 @@ export default function ResidentPage() {
         {/* Quick Actions */}
         <section>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card 
               className="hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => setShowScanModal(true)}
@@ -240,9 +250,9 @@ export default function ResidentPage() {
 
         {/* Files Section */}
         <section>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Files</h3>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant={activeFilter === 'all' ? 'default' : 'outline'}
                 size="sm"

@@ -24,7 +24,7 @@ export default function ResidentDashboard() {
   const [, setLocation] = useLocation();
   const [resident, setResident] = useState<Resident | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const { toast } = useToast();
 
   const loadResidentData = async () => {
@@ -51,6 +51,10 @@ export default function ResidentDashboard() {
   }, [id]);
 
   const handleGoBack = () => {
+    if (id) {
+      setLocation(`/resident/${id}`);
+      return;
+    }
     setLocation('/dashboard');
   };
 
@@ -78,7 +82,7 @@ export default function ResidentDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50 relative" data-testid="resident-dashboard">
+    <div className="min-h-screen flex bg-gray-50 relative overflow-x-hidden" data-testid="resident-dashboard">
       {/* Mobile overlay for sidebar */}
       {!sidebarCollapsed && (
         <div 

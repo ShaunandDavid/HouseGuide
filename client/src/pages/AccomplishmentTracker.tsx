@@ -69,7 +69,7 @@ export default function AccomplishmentTracker() {
   };
 
   const handleGoBack = () => {
-    setLocation(`/resident/${id}/trackers`);
+    setLocation(`/resident/${id}/dashboard`);
   };
 
   const resetForm = () => {

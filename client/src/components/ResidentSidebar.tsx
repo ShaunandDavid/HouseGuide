@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { CATEGORY_LABEL } from "@shared/categories";
 import { 
   getGoalsByResident, 
   getChoresByResident, 
@@ -119,7 +120,9 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
           break;
         case 'note':
           title = item.text?.substring(0, 30) + (item.text?.length > 30 ? '...' : '') || 'Untitled Note';
-          subtitle = `Source: ${item.source || 'manual'}`;
+          subtitle = item.category && item.category !== 'general'
+            ? `Category: ${CATEGORY_LABEL[item.category]} | Source: ${item.source || 'manual'}`
+            : `Source: ${item.source || 'manual'}`;
           break;
         case 'file':
           title = item.filename || 'Untitled File';
@@ -655,6 +658,15 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                       : 'bg-green-100 text-green-800'
                   }`}>
                     {entryDetail.entry.data.source === 'manual' ? 'Manual Entry' : 'OCR Extracted'}
+                  </span>
+                </div>
+              )}
+
+              {entryDetail.entry.data.category && entryDetail.entry.data.category !== 'general' && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1">Category:</h4>
+                  <span className="inline-flex px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                    {CATEGORY_LABEL[entryDetail.entry.data.category] || entryDetail.entry.data.category}
                   </span>
                 </div>
               )}

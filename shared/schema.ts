@@ -206,6 +206,8 @@ export const insertChecklistSchema = z.object({
   phase: z.string().max(100).optional(),
   homeGroup: z.string().max(200).optional(),
   stepWork: z.string().max(500).optional(),
+  sponsorMentor: z.string().max(200).optional(),
+  program: z.string().max(200).optional(),
   professionalHelp: z.string().max(500).optional(),
   job: z.string().max(200).optional(),
   lastUpdated: z.string().optional(),
@@ -221,6 +223,8 @@ export interface Checklist {
   phase?: string;
   homeGroup?: string;
   stepWork?: string;
+  sponsorMentor?: string;
+  program?: string;
   professionalHelp?: string;
   job?: string;
   lastUpdated?: string;
@@ -468,6 +472,8 @@ export const checklists = pgTable("checklists", {
   phase: varchar("phase", { length: 100 }),
   homeGroup: varchar("home_group", { length: 200 }),
   stepWork: varchar("step_work", { length: 500 }),
+  sponsorMentor: varchar("sponsor_mentor", { length: 200 }),
+  program: varchar("program", { length: 200 }),
   professionalHelp: varchar("professional_help", { length: 500 }),
   job: varchar("job", { length: 200 }),
   lastUpdated: varchar("last_updated"),

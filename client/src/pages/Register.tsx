@@ -20,6 +20,8 @@ export default function Register() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [registrationMessage, setRegistrationMessage] = useState("");
+  const [emailSent, setEmailSent] = useState(true);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -80,10 +82,14 @@ export default function Register() {
         throw new Error(errorData.error || 'Registration failed');
       }
 
+      const data = await response.json();
+      setRegistrationMessage(data.message || "Please check your email to verify your account.");
+      setEmailSent(data.emailSent !== false);
       setIsRegistered(true);
       toast({
         title: "Registration Successful",
-        description: "Please check your email to verify your account.",
+        description: data.message || "Please check your email to verify your account.",
+        ...(data.emailSent === false ? { variant: "destructive" } : {})
       });
     } catch (error: any) {
       toast({
@@ -110,11 +116,10 @@ export default function Register() {
 
           <Card>
             <CardContent className="pt-6">
-              <Alert>
+              <Alert className={emailSent ? "" : "border-red-200 bg-red-50"}>
                 <Mail className="h-4 w-4" />
                 <AlertDescription>
-                  Please check your email and click the verification link to complete your registration. 
-                  Once verified, you can sign in and set up your facility dashboard.
+                  {registrationMessage || "Please check your email and click the verification link to complete your registration."}
                 </AlertDescription>
               </Alert>
               

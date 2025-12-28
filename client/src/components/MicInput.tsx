@@ -86,13 +86,20 @@ export function MicInput({
     resetTranscript();
 
     const started = startListening();
-    if (started) {
-      setIsRecording(true);
+    if (!started) {
       toast({
-        title: 'Voice Input Started',
-        description: 'Speak clearly. Tap the stop button when finished.',
+        title: 'Voice Input Unavailable',
+        description: 'Unable to start voice input. Please check microphone permissions.',
+        variant: 'destructive',
       });
+      return;
     }
+
+    setIsRecording(true);
+    toast({
+      title: 'Voice Input Started',
+      description: 'Speak clearly. Tap the stop button when finished.',
+    });
   }, [isSupported, disabled, startListening, resetTranscript, toast]);
 
   const handleStopRecording = useCallback(() => {
