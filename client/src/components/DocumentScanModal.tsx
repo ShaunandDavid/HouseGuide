@@ -103,12 +103,12 @@ export function DocumentScanModal({
       console.error('OCR processing error:', error);
       // Clear any partial state and show user-friendly message
       setOcrResult('');
-      setClassification(null);
+      setClassification({ label: null, confidence: 0 });
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to process the image';
       toast({
         title: "Processing Failed",
-        description: `${errorMessage}. Please try a different image or retake the photo.`,
+        description: `${errorMessage}. You can still save the document or retake the photo.`,
         variant: "destructive"
       });
     } finally {

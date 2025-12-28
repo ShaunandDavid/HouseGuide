@@ -50,10 +50,22 @@ export default function Login() {
         console.error('LOGIN: User has no houseId:', user);
       }
     } catch (error) {
-      // Authentication failed - handled in UI
+      const rawMessage = error instanceof Error ? error.message : "Sign in failed.";
+      let description = rawMessage;
+
+      if (rawMessage.includes("UNVERIFIED_EMAIL")) {
+        description = "Please verify your email before signing in.";
+      } else if (rawMessage.includes("INVALID_PASSWORD") || rawMessage.includes("NOT_FOUND")) {
+        description = "Invalid email or password. Please try again.";
+      } else if (rawMessage.toLowerCase().includes("too many authentication attempts")) {
+        description = "Too many attempts. Please wait a few minutes and try again.";
+      } else if (rawMessage.includes("Account setup incomplete")) {
+        description = "Account setup is incomplete. Please contact support.";
+      }
+
       toast({
         title: "Sign In Failed",
-        description: "Invalid email or password. Please try again.",
+        description,
         variant: "destructive"
       });
     } finally {

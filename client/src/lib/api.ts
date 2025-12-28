@@ -69,6 +69,10 @@ export function setCurrentUser(user: Guide) {
   localStorage.setItem('current-user', JSON.stringify(user));
 }
 
+export function clearCurrentUser() {
+  localStorage.removeItem('current-user');
+}
+
 // Houses
 export async function getHouseByName(idOrName: string): Promise<House> {
   return apiRequest(`/houses/${idOrName}`);

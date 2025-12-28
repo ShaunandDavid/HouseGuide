@@ -1,5 +1,78 @@
 import Tesseract from 'tesseract.js';
 
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB
+const MAX_IMAGE_DIMENSION = 2000;
+const JPEG_QUALITY = 0.85;
+
+const loadImageFromFile = (imageFile: File): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(imageFile);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    img.onload = () => {
+      cleanup();
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      cleanup();
+      reject(new Error('Unsupported or corrupted image file. Try saving as JPEG.'));
+    };
+
+    img.src = objectUrl;
+  });
+};
+
+const normalizeImageForOCR = async (imageFile: File): Promise<File> => {
+  if (!imageFile.type.startsWith('image/')) {
+    throw new Error('Selected file is not a valid image');
+  }
+
+  if (imageFile.size > MAX_IMAGE_BYTES) {
+    throw new Error('Image file is too large (max 20MB)');
+  }
+
+  const img = await loadImageFromFile(imageFile);
+  const width = img.naturalWidth || img.width;
+  const height = img.naturalHeight || img.height;
+
+  if (!width || !height) {
+    throw new Error('Unable to read image dimensions');
+  }
+
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Canvas is not supported on this device');
+  }
+
+  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) {
+        resolve(result);
+      } else {
+        reject(new Error('Unable to convert image for OCR'));
+      }
+    }, 'image/jpeg', JPEG_QUALITY);
+  });
+
+  const normalizedName = imageFile.name.replace(/\.[^.]+$/, '') || 'document';
+  return new File([blob], `${normalizedName}.jpg`, { type: 'image/jpeg' });
+};
+
 export interface OCRResult {
   text: string;
   confidence: number;
@@ -12,26 +85,8 @@ export async function processImageWithOCR(
   let imageUrl: string | null = null;
   
   try {
-    // Validate file type
-    if (!imageFile.type.startsWith('image/')) {
-      throw new Error('Selected file is not a valid image');
-    }
-    
-    // Validate file size (max 10MB)
-    if (imageFile.size > 10 * 1024 * 1024) {
-      throw new Error('Image file is too large (max 10MB)');
-    }
-    
-    // Create object URL for Tesseract
-    imageUrl = URL.createObjectURL(imageFile);
-    
-    // Test if image can be loaded before OCR
-    await new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Invalid or corrupted image file'));
-      img.src = imageUrl!;
-    });
+    const normalizedFile = await normalizeImageForOCR(imageFile);
+    imageUrl = URL.createObjectURL(normalizedFile);
     
     const { data } = await Tesseract.recognize(imageUrl, 'eng', {
       logger: m => {

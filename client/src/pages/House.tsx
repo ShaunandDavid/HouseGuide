@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { getCurrentUser } from "@/lib/api";
+import { getCurrentUser, logout, clearCurrentUser } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +66,18 @@ export default function House() {
       setFilteredResidents(residents.filter(resident => (resident.status || 'active') === statusFilter));
     }
   }, [residents, statusFilter]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('LOGOUT: ERROR -', error);
+    } finally {
+      clearCurrentUser();
+      setShowSettings(false);
+      setLocation("/login");
+    }
+  };
 
   const loadHouseData = async (signal?: AbortSignal) => {
     if (!houseId) return;
@@ -437,6 +449,13 @@ export default function House() {
             </div>
           </div>
           <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              data-testid="logout-button"
+            >
+              Log Out
+            </Button>
             <Button onClick={() => setShowSettings(false)} data-testid="close-settings">
               Close
             </Button>
