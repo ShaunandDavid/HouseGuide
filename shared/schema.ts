@@ -72,7 +72,7 @@ export const insertFileSchema = z.object({
   mimeType: z.string().max(100),
   url: z.string().url(),
   size: z.number().min(0),
-  type: z.enum(["commitment", "writeup", "general", "photo"]).default("general"),
+  type: z.enum(["commitment", "writeup", "incident", "general", "photo"]).default("general"),
   ocrText: z.string().optional(),
   createdBy: z.string(),
 });
@@ -87,7 +87,7 @@ export interface FileRecord {
   mimeType: string;
   url: string;
   size: number;
-  type: "commitment" | "writeup" | "general" | "photo";
+  type: "commitment" | "writeup" | "incident" | "general" | "photo";
   ocrText?: string;
   createdBy: string;
   created: string;

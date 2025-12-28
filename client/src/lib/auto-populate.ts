@@ -159,16 +159,19 @@ function categorizeNote(text: string): string | null {
 }
 
 export async function autoPopulateTrackers(
-  ocrText: string, 
-  residentId: string, 
-  houseId: string, 
-  createdBy: string
+  ocrText: string,
+  residentId: string,
+  houseId: string,
+  createdBy: string,
+  options?: { includeNotes?: boolean }
 ): Promise<{ created: number; entries: TrackerEntry[] }> {
+  const includeNotes = options?.includeNotes ?? true;
   const entries = parseOCRForTrackers(ocrText);
+  const filteredEntries = includeNotes ? entries : entries.filter(entry => entry.type !== 'note');
   let created = 0;
   
   try {
-    for (const entry of entries) {
+    for (const entry of filteredEntries) {
       const baseData = {
         residentId,
         houseId,
@@ -207,5 +210,5 @@ export async function autoPopulateTrackers(
     console.error('Error auto-populating trackers:', error);
   }
   
-  return { created, entries };
+  return { created, entries: filteredEntries };
 }

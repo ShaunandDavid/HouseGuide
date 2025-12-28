@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createNote } from "@/lib/api";
+import { createNote, createGoal, createIncident, createMeeting, createAccomplishment, createChore, getCurrentUser } from "@/lib/api";
 import { CategoryPills } from "@/components/CategoryPills";
 import type { InsertNote } from "@shared/schema";
 import type { Category } from "@shared/categories";
@@ -18,15 +19,104 @@ interface QuickNoteModalProps {
 export function QuickNoteModal({ isOpen, onClose, residentId }: QuickNoteModalProps) {
   const [noteText, setNoteText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
+  const [trackerTarget, setTrackerTarget] = useState<'none' | 'goal' | 'incident' | 'meeting' | 'accomplishment' | 'chore'>('none');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const createTrackerEntry = async (text: string, target: typeof trackerTarget) => {
+    if (target === 'none') return;
+
+    const currentUser = getCurrentUser();
+    if (!currentUser?.houseId || !currentUser?.id) {
+      throw new Error('Missing user context for tracker entry.');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const title = text.split(/[\n.]/)[0]?.trim().slice(0, 80) || 'Quick Note';
+
+    switch (target) {
+      case 'goal':
+        await createGoal({
+          residentId,
+          houseId: currentUser.houseId,
+          title,
+          description: text,
+          status: 'not_started',
+          priority: 'medium',
+          createdBy: currentUser.id
+        });
+        break;
+      case 'incident':
+        await createIncident({
+          residentId,
+          houseId: currentUser.houseId,
+          incidentType: 'behavioral',
+          severity: 'medium',
+          description: text,
+          dateOccurred: today,
+          createdBy: currentUser.id
+        });
+        break;
+      case 'meeting':
+        await createMeeting({
+          residentId,
+          houseId: currentUser.houseId,
+          meetingType: 'other',
+          dateAttended: today,
+          notes: text,
+          createdBy: currentUser.id
+        });
+        break;
+      case 'accomplishment':
+        await createAccomplishment({
+          residentId,
+          houseId: currentUser.houseId,
+          title,
+          description: text,
+          dateAchieved: today,
+          category: 'other',
+          createdBy: currentUser.id
+        });
+        break;
+      case 'chore':
+        await createChore({
+          residentId,
+          houseId: currentUser.houseId,
+          choreName: title,
+          assignedDate: today,
+          status: 'assigned',
+          notes: text,
+          createdBy: currentUser.id
+        });
+        break;
+    }
+  };
+
   const createNoteMutation = useMutation({
     mutationFn: createNote,
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
+      const target = trackerTarget;
+      if (target !== 'none' && variables?.text) {
+        try {
+          await createTrackerEntry(variables.text, target);
+          toast({
+            title: "Tracker Updated",
+            description: `Created a ${target} entry from your note.`,
+          });
+        } catch (error) {
+          console.error('Tracker creation failed:', error);
+          toast({
+            title: "Tracker Update Failed",
+            description: "Note saved, but tracker entry failed.",
+            variant: "destructive",
+          });
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/notes", residentId] });
       setNoteText("");
       setSelectedCategory(undefined);
+      setTrackerTarget('none');
       onClose();
       toast({
         title: "Note Created",
@@ -61,6 +151,7 @@ export function QuickNoteModal({ isOpen, onClose, residentId }: QuickNoteModalPr
   const handleClose = () => {
     setNoteText("");
     setSelectedCategory(undefined);
+    setTrackerTarget('none');
     onClose();
   };
 
@@ -80,6 +171,22 @@ export function QuickNoteModal({ isOpen, onClose, residentId }: QuickNoteModalPr
                   onChange={setSelectedCategory}
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Send to Tracker (optional)</label>
+              <Select value={trackerTarget} onValueChange={(value) => setTrackerTarget(value as typeof trackerTarget)}>
+                <SelectTrigger data-testid="quick-note-tracker-select">
+                  <SelectValue placeholder="Just a note" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Just a note</SelectItem>
+                  <SelectItem value="goal">Goal / Commitment</SelectItem>
+                  <SelectItem value="incident">Incident / Write-up</SelectItem>
+                  <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="accomplishment">Accomplishment</SelectItem>
+                  <SelectItem value="chore">Chore</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Textarea
               placeholder="Write your note here..."

@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Camera, Upload, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Camera, X, Mic, Square, Loader2 } from "lucide-react";
 import { processImageWithOCR } from "@/lib/tesseract";
 import { classifyDocumentByKeywords } from "@/lib/classify";
-import { uploadFile, createNote } from "@/lib/api";
+import { uploadFile, createNote, createGoal, createIncident, transcribeVoiceNote } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/api";
 import { autoPopulateTrackers } from "@/lib/auto-populate";
@@ -39,9 +40,148 @@ export function DocumentScanModal({
     label: 'commitment' | 'writeup' | null;
     confidence: number;
   } | null>(null);
+  const [documentType, setDocumentType] = useState<'commitment' | 'writeup' | 'incident' | 'general' | 'photo'>('general');
+  const [verificationText, setVerificationText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
+
+  const isRecorderSupported = typeof window !== 'undefined'
+    && typeof MediaRecorder !== 'undefined'
+    && !!navigator?.mediaDevices?.getUserMedia;
+
+  const getSupportedMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') return '';
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/m4a',
+      'audio/aac',
+      'audio/mpeg',
+      'audio/ogg;codecs=opus',
+      'audio/ogg'
+    ];
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  };
+
+  const getAudioExtension = (mimeType: string) => {
+    if (mimeType.includes('webm')) return '.webm';
+    if (mimeType.includes('ogg')) return '.ogg';
+    if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return '.mp3';
+    if (mimeType.includes('mp4') || mimeType.includes('m4a')) return '.m4a';
+    if (mimeType.includes('aac')) return '.aac';
+    if (mimeType.includes('wav')) return '.wav';
+    return '.webm';
+  };
+
+  const cleanupMedia = useCallback(() => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.onerror = null;
+      mediaRecorderRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    audioChunksRef.current = [];
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (!isRecorderSupported) {
+      toast({
+        title: "Voice Not Supported",
+        description: "Your device does not support in-app voice recording.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRecording(true);
+    setIsTranscribing(false);
+    audioChunksRef.current = [];
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const mimeType = getSupportedMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        setIsRecording(false);
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        cleanupMedia();
+
+        if (!blob.size) {
+          return;
+        }
+
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          const extension = getAudioExtension(blob.type || '');
+          formData.append('audio', blob, `verification-note${extension}`);
+          formData.append('residentId', residentId);
+
+          const result = await transcribeVoiceNote(formData);
+          const transcript = result?.fullTranscript || '';
+          if (transcript.trim()) {
+            setVerificationText(transcript.trim());
+            toast({
+              title: "Voice Note Added",
+              description: "Transcript added to verification notes."
+            });
+          } else {
+            toast({
+              title: "No Transcript",
+              description: "We could not detect any speech. Please try again.",
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('Verification voice note error:', error);
+          toast({
+            title: "Voice Note Failed",
+            description: "Unable to transcribe this recording. Please try again.",
+            variant: "destructive"
+          });
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      recorder.start();
+    } catch (error) {
+      setIsRecording(false);
+      cleanupMedia();
+      toast({
+        title: "Microphone Error",
+        description: "Unable to start recording. Check microphone permissions.",
+        variant: "destructive"
+      });
+    }
+  }, [cleanupMedia, getAudioExtension, getSupportedMimeType, isRecorderSupported, residentId, toast]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
@@ -50,6 +190,8 @@ export function DocumentScanModal({
     setOcrResult('');
     setIsLowQualityOCR(false);
     setClassification(null);
+    setDocumentType('general');
+    setVerificationText('');
 
     try {
       const result = await processImageWithOCR(file, setOcrProgress);
@@ -72,16 +214,25 @@ export function DocumentScanModal({
           if (response.ok) {
             const aiResult = await response.json();
             setClassification(aiResult);
+            if (aiResult?.label) {
+              setDocumentType(aiResult.label);
+            }
           } else {
             // Fallback to keyword classification
             const classificationResult = classifyDocumentByKeywords(result.text);
             setClassification(classificationResult);
+            if (classificationResult?.label) {
+              setDocumentType(classificationResult.label);
+            }
           }
         } catch (error) {
           console.warn('Classification failed, using keyword fallback:', error);
           // Fallback to keyword classification
           const classificationResult = classifyDocumentByKeywords(cleanedText);
           setClassification(classificationResult);
+          if (classificationResult?.label) {
+            setDocumentType(classificationResult.label);
+          }
         }
       } else if (cleanedText) {
         setClassification({ label: null, confidence: 0 });
@@ -128,17 +279,7 @@ export function DocumentScanModal({
   };
 
   const handleSaveDocument = async () => {
-    if (!selectedFile || !classification) return;
-
-    let finalType = classification.label;
-    
-    // If confidence is low or no classification, ask user
-    if (!finalType || classification.confidence < 0.6) {
-      const isCommitment = window.confirm(
-        'Could not automatically classify this document. Is this a COMMITMENT?\n\nOK = Commitment\nCancel = Write-Up'
-      );
-      finalType = isCommitment ? 'commitment' : 'writeup';
-    }
+    if (!selectedFile) return;
 
     try {
       const currentUser = getCurrentUser();
@@ -146,12 +287,25 @@ export function DocumentScanModal({
         throw new Error('User not authenticated');
       }
 
+      const finalType = documentType || 'general';
+      const verificationNote = verificationText.trim();
+      const requiresVerification = ['commitment', 'writeup', 'incident'].includes(finalType);
+
+      if (requiresVerification && !verificationNote) {
+        toast({
+          title: "Verification Needed",
+          description: "Add a short text or voice verification note before saving.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Upload file using multipart form data (more efficient than base64)
       const uploadResult = await uploadFile(
         selectedFile,
         residentId,
         houseId,
-        finalType === 'commitment' ? 'commitment' : finalType === 'writeup' ? 'writeup' : 'photo',
+        finalType,
         ocrResult
       );
       
@@ -256,6 +410,45 @@ export function DocumentScanModal({
           }
         }
       }
+
+      if (verificationNote) {
+        await createNote({
+          residentId,
+          houseId,
+          text: verificationNote,
+          source: 'manual',
+          linkedFileId: fileRecord.id,
+          createdBy: currentUser.id
+        });
+
+        const today = new Date().toISOString().split('T')[0];
+
+        if (finalType === 'commitment') {
+          const title = verificationNote.split(/[\n.]/)[0]?.trim().slice(0, 80) || 'Commitment';
+          await createGoal({
+            residentId,
+            houseId,
+            title,
+            description: verificationNote,
+            status: 'not_started',
+            priority: 'medium',
+            createdBy: currentUser.id
+          });
+        }
+
+        if (finalType === 'writeup' || finalType === 'incident') {
+          await createIncident({
+            residentId,
+            houseId,
+            incidentType: finalType === 'writeup' ? 'policy_violation' : 'behavioral',
+            severity: 'medium',
+            description: verificationNote,
+            dateOccurred: today,
+            createdBy: currentUser.id
+          });
+        }
+      }
+
       if (ocrResult && ocrResult.trim() && isLowQualityOCR) {
         toast({
           title: "OCR Skipped",
@@ -287,6 +480,11 @@ export function DocumentScanModal({
     setOcrResult('');
     setIsLowQualityOCR(false);
     setClassification(null);
+    setDocumentType('general');
+    setVerificationText('');
+    setIsRecording(false);
+    setIsTranscribing(false);
+    cleanupMedia();
     onClose();
   };
 
@@ -296,6 +494,11 @@ export function DocumentScanModal({
     setIsLowQualityOCR(false);
     setClassification(null);
     setIsProcessing(false);
+    setDocumentType('general');
+    setVerificationText('');
+    setIsRecording(false);
+    setIsTranscribing(false);
+    cleanupMedia();
   };
 
   return (
@@ -394,6 +597,74 @@ export function DocumentScanModal({
             </div>
           )}
 
+          {selectedFile && (
+            <div className="space-y-2" data-testid="document-type-selector">
+              <label className="text-sm font-medium">Document Type</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'commitment', label: 'Commitment' },
+                  { value: 'writeup', label: 'Write-up' },
+                  { value: 'incident', label: 'Incident' },
+                  { value: 'general', label: 'General' },
+                  { value: 'photo', label: 'Photo' },
+                ].map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    size="sm"
+                    variant={documentType === option.value ? 'default' : 'outline'}
+                    onClick={() => setDocumentType(option.value as typeof documentType)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedFile && (
+            <div className="space-y-2" data-testid="verification-note">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-medium">Verification Note</label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isProcessing || isTranscribing}
+                >
+                  {isTranscribing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Transcribing
+                    </>
+                  ) : isRecording ? (
+                    <>
+                      <Square className="w-4 h-4 mr-2" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-4 h-4 mr-2" />
+                      Record
+                    </>
+                  )}
+                </Button>
+              </div>
+              <Textarea
+                value={verificationText}
+                onChange={(e) => setVerificationText(e.target.value)}
+                placeholder="Add a quick verification note (text or voice)."
+                rows={3}
+              />
+              {['commitment', 'writeup', 'incident'].includes(documentType) && (
+                <div className="text-xs text-gray-500">
+                  Required for commitments, write-ups, and incidents.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex space-x-3">
             {selectedFile && (
@@ -410,7 +681,7 @@ export function DocumentScanModal({
                 <Button 
                   className="flex-1" 
                   onClick={handleSaveDocument}
-                  disabled={isProcessing || !selectedFile || !classification}
+                  disabled={isProcessing || isTranscribing || !selectedFile}
                   data-testid="save-document-button"
                 >
                   Save Document

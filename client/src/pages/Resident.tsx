@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
 import { FileCard } from "@/components/ui/file-card";
+import { FilePreviewModal } from "@/components/FilePreviewModal";
 import { DocumentScanModal } from "@/components/DocumentScanModal";
 import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
 import { StatusManagementModal } from "@/components/StatusManagementModal";
@@ -30,13 +31,15 @@ export default function ResidentPage() {
   const [resident, setResident] = useState<Resident | null>(null);
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [filteredFiles, setFilteredFiles] = useState<FileRecord[]>([]);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'commitment' | 'writeup'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'commitment' | 'writeup' | 'incident'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReportEditor, setShowReportEditor] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const [showVoiceNoteModal, setShowVoiceNoteModal] = useState(false);
+  const [previewFile, setPreviewFile] = useState<FileRecord | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -87,12 +90,13 @@ export default function ResidentPage() {
   };
 
   const handleViewFile = (file: FileRecord) => {
-    // Could open a detailed view modal or navigate to a detail page
-    // File viewing functionality would be implemented here
+    setPreviewFile(file);
+    setIsPreviewOpen(true);
   };
 
   const commitmentCount = files.filter(f => f.type === 'commitment').length;
   const writeupCount = files.filter(f => f.type === 'writeup').length;
+  const incidentCount = files.filter(f => f.type === 'incident').length;
 
   if (isLoading) {
     return (
@@ -281,6 +285,16 @@ export default function ResidentPage() {
                 <AlertTriangle className="w-4 h-4 mr-1" />
                 Write-ups ({writeupCount})
               </Button>
+              <Button
+                variant={activeFilter === 'incident' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter('incident')}
+                className={activeFilter === 'incident' ? 'bg-red-600 hover:bg-red-700' : 'text-red-700 border-red-300 hover:bg-red-50'}
+                data-testid="filter-incidents"
+              >
+                <AlertTriangle className="w-4 h-4 mr-1" />
+                Incidents ({incidentCount})
+              </Button>
             </div>
           </div>
 
@@ -369,6 +383,17 @@ export default function ResidentPage() {
           </div>
         </div>
       )}
+
+      <FilePreviewModal
+        file={previewFile}
+        open={isPreviewOpen}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open) {
+            setPreviewFile(null);
+          }
+        }}
+      />
     </div>
   );
 }

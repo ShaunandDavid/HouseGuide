@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { FileRecord } from "@shared/schema";
 // Helper function to get file URL
 const getFileUrl = (file: FileRecord) => {
-  return `/api/files/${file.id}/image`;
+  return file.url;
 };
 
 interface FileCardProps {
@@ -34,6 +34,15 @@ export function FileCard({ file, onViewFile }: FileCardProps) {
           badgeBg: 'bg-amber-100',
           badgeText: 'text-amber-800',
           label: 'Write-up'
+        };
+      case 'incident':
+        return {
+          icon: AlertTriangle,
+          bgColor: 'bg-red-100',
+          textColor: 'text-red-600',
+          badgeBg: 'bg-red-100',
+          badgeText: 'text-red-800',
+          label: 'Incident'
         };
       case 'photo':
         return {

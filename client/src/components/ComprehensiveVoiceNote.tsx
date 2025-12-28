@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Mic, Square, Loader2, Wand2, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createNote, transcribeVoiceNote } from "@/lib/api";
+import { createNote, transcribeVoiceNote, getCurrentUser } from "@/lib/api";
+import { autoPopulateTrackers } from "@/lib/auto-populate";
 import type { InsertNote } from "@shared/schema";
 import type { Category } from "@shared/categories";
 
@@ -249,6 +250,27 @@ export function ComprehensiveVoiceNote({ isOpen, onClose, residentId }: Comprehe
       );
 
       await Promise.all(savePromises);
+
+      const currentUser = getCurrentUser();
+      if (currentUser?.houseId && transcript.trim()) {
+        try {
+          const populateResult = await autoPopulateTrackers(
+            transcript,
+            residentId,
+            currentUser.houseId,
+            currentUser.id,
+            { includeNotes: false }
+          );
+          if (populateResult.created > 0) {
+            toast({
+              title: "Trackers Updated",
+              description: `Created ${populateResult.created} tracker entries from this voice note.`,
+            });
+          }
+        } catch (error) {
+          console.error('Voice note tracker auto-populate failed:', error);
+        }
+      }
 
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["/api/notes", residentId] });

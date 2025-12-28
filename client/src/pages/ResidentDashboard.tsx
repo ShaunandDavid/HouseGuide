@@ -1,13 +1,21 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, Route, Switch } from "wouter";
-import { ArrowLeft, User } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, User, Camera, FileText, Mic, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import ResidentSidebar from "@/components/ResidentSidebar";
-import { getResident } from "@/lib/api";
+import { getResident, getFilesByResident } from "@/lib/api";
 import type { Resident } from "@shared/schema";
+import type { FileRecord } from "@shared/schema";
+import { FileCard } from "@/components/ui/file-card";
+import { DocumentScanModal } from "@/components/DocumentScanModal";
+import { QuickNoteModal } from "@/components/QuickNoteModal";
+import { ComprehensiveVoiceNote } from "@/components/ComprehensiveVoiceNote";
+import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
+import { StatusManagementModal } from "@/components/StatusManagementModal";
+import { FilePreviewModal } from "@/components/FilePreviewModal";
 
 // Import existing tracker components
 import GoalTracker from "./GoalTracker";
@@ -23,8 +31,19 @@ export default function ResidentDashboard() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [resident, setResident] = useState<Resident | null>(null);
+  const [files, setFiles] = useState<FileRecord[]>([]);
+  const [filteredFiles, setFilteredFiles] = useState<FileRecord[]>([]);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'commitment' | 'writeup' | 'incident'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
+  const [showVoiceNoteModal, setShowVoiceNoteModal] = useState(false);
+  const [showReportEditor, setShowReportEditor] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [previewFile, setPreviewFile] = useState<FileRecord | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [showWelcomeTip, setShowWelcomeTip] = useState(true);
   const { toast } = useToast();
 
   const loadResidentData = async () => {
@@ -32,8 +51,12 @@ export default function ResidentDashboard() {
     
     setIsLoading(true);
     try {
-      const residentData = await getResident(id);
+      const [residentData, filesData] = await Promise.all([
+        getResident(id),
+        getFilesByResident(id)
+      ]);
       setResident(residentData);
+      setFiles(filesData);
     } catch (error) {
       console.error('Failed to load resident:', error);
       toast({
@@ -50,12 +73,37 @@ export default function ResidentDashboard() {
     loadResidentData();
   }, [id]);
 
-  const handleGoBack = () => {
-    if (id) {
-      setLocation(`/resident/${id}`);
-      return;
+  useEffect(() => {
+    if (activeFilter === 'all') {
+      setFilteredFiles(files);
+    } else {
+      setFilteredFiles(files.filter(file => file.type === activeFilter));
     }
+  }, [files, activeFilter]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('resident-dashboard-tip');
+    if (stored === 'dismissed') {
+      setShowWelcomeTip(false);
+    }
+  }, []);
+
+  const handleGoBack = () => {
     setLocation('/dashboard');
+  };
+
+  const handleDocumentSaved = () => {
+    loadResidentData();
+  };
+
+  const handleViewFile = (file: FileRecord) => {
+    setPreviewFile(file);
+    setIsPreviewOpen(true);
+  };
+
+  const handleDismissTip = () => {
+    setShowWelcomeTip(false);
+    localStorage.setItem('resident-dashboard-tip', 'dismissed');
   };
 
   if (isLoading) {
@@ -186,9 +234,23 @@ export default function ResidentDashboard() {
             </Route>
             
             <Route path="/resident/:id/pictures">
-              <div className="bg-white p-4 sm:p-6 rounded-lg border">
-                <h2 className="text-lg font-semibold mb-4">Pictures</h2>
-                <p className="text-sm sm:text-base text-gray-600">Uploaded pictures and scanned documents will appear here.</p>
+              <div className="bg-white p-4 sm:p-6 rounded-lg border space-y-4">
+                <h2 className="text-lg font-semibold">Pictures</h2>
+                {filteredFiles.length === 0 ? (
+                  <div className="text-sm text-gray-600">
+                    No documents have been uploaded for this resident yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredFiles.map((file) => (
+                      <FileCard
+                        key={file.id}
+                        file={file}
+                        onViewFile={handleViewFile}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </Route>
             
@@ -203,25 +265,211 @@ export default function ResidentDashboard() {
             
             {/* Default route shows overview - Mobile First */}
             <Route>
-              <div className="space-y-4 sm:space-y-6">
-                <div className="bg-white p-4 sm:p-6 rounded-lg border">
-                  <h2 className="text-lg font-semibold mb-4">Welcome to {resident.firstName}'s Dashboard</h2>
-                  <p className="text-sm sm:text-base text-gray-600 mb-4">
-                    <span className="hidden sm:inline">Use the sidebar to navigate between different sections:</span>
-                    <span className="sm:hidden">Tap the menu button (☰) to navigate:</span>
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-600">
-                    <li>• <strong>Weekly Reports:</strong> AI-generated summaries and reports</li>
-                    <li>• <strong>Pictures:</strong> Uploaded documents and photos</li>
-                    <li>• <strong>Notes:</strong> Manual entries and OCR text</li>
-                    <li>• <strong>Trackers:</strong> Goals, chores, incidents, and more</li>
-                  </ul>
+              <div className="space-y-6">
+                {showWelcomeTip && (
+                  <div className="relative rounded-2xl border border-white/50 bg-white/70 backdrop-blur-xl p-4 shadow-lg">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDismissTip}
+                      className="absolute top-2 right-2"
+                      aria-label="Dismiss help"
+                    >
+                      Dismiss
+                    </Button>
+                    <h2 className="text-lg font-semibold mb-2">Welcome to {resident.firstName}'s Dashboard</h2>
+                    <p className="text-sm text-gray-600">
+                      Use the menu to jump between trackers, notes, pictures, and reports. Everything
+                      lives on this page now.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowStatusModal(true)}
+                  >
+                    Manage Status
+                  </Button>
+                  <Button
+                    onClick={() => setShowReportEditor(true)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Generate Report
+                  </Button>
                 </div>
+
+                <section>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Card
+                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => setShowScanModal(true)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
+                          <Camera className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <h4 className="font-medium text-gray-900 mb-1">Scan Document</h4>
+                        <p className="text-sm text-gray-600">Capture photo with OCR</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => setShowQuickNoteModal(true)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mb-2">
+                          <FileText className="w-4 h-4 text-green-600" />
+                        </div>
+                        <h4 className="font-medium text-gray-900 mb-1">Add Note</h4>
+                        <p className="text-sm text-gray-600">Quick text note</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => setShowVoiceNoteModal(true)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
+                          <Mic className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <h4 className="font-medium text-gray-900 mb-1">Voice Note</h4>
+                        <p className="text-sm text-gray-600">AI categorized recording</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </section>
+
+                <section>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Files</h3>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={activeFilter === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveFilter("all")}
+                      >
+                        All ({files.length})
+                      </Button>
+                      <Button
+                        variant={activeFilter === "commitment" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveFilter("commitment")}
+                        className={activeFilter === "commitment" ? "bg-green-600 hover:bg-green-700" : "text-green-700 border-green-300 hover:bg-green-50"}
+                      >
+                        Commitments ({files.filter(f => f.type === "commitment").length})
+                      </Button>
+                      <Button
+                        variant={activeFilter === "writeup" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveFilter("writeup")}
+                        className={activeFilter === "writeup" ? "bg-amber-600 hover:bg-amber-700" : "text-amber-700 border-amber-300 hover:bg-amber-50"}
+                      >
+                        Write-ups ({files.filter(f => f.type === "writeup").length})
+                      </Button>
+                      <Button
+                        variant={activeFilter === "incident" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveFilter("incident")}
+                        className={activeFilter === "incident" ? "bg-red-600 hover:bg-red-700" : "text-red-700 border-red-300 hover:bg-red-50"}
+                      >
+                        Incidents ({files.filter(f => f.type === "incident").length})
+                      </Button>
+                    </div>
+                  </div>
+
+                  {filteredFiles.length === 0 ? (
+                    <Card>
+                      <CardContent className="pt-6 text-center">
+                        <p className="text-gray-600">
+                          {activeFilter === "all"
+                            ? "No documents have been uploaded for this resident yet."
+                            : `No ${activeFilter}s have been uploaded for this resident yet.`}
+                        </p>
+                        <Button
+                          onClick={() => setShowScanModal(true)}
+                          className="mt-4"
+                        >
+                          Scan First Document
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredFiles.map((file) => (
+                        <FileCard
+                          key={file.id}
+                          file={file}
+                          onViewFile={handleViewFile}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
               </div>
             </Route>
           </Switch>
         </main>
       </div>
+
+      <DocumentScanModal
+        isOpen={showScanModal}
+        onClose={() => setShowScanModal(false)}
+        residentId={resident.id}
+        houseId={resident.house}
+        onDocumentSaved={handleDocumentSaved}
+      />
+
+      <QuickNoteModal
+        isOpen={showQuickNoteModal}
+        onClose={() => setShowQuickNoteModal(false)}
+        residentId={resident.id}
+      />
+
+      <ComprehensiveVoiceNote
+        isOpen={showVoiceNoteModal}
+        onClose={() => setShowVoiceNoteModal(false)}
+        residentId={resident.id}
+      />
+
+      {showReportEditor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-semibold">AI Weekly Report Generator</h2>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <WeeklyReportEditor
+                resident={resident}
+                onClose={() => setShowReportEditor(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <StatusManagementModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        resident={resident}
+        onUpdate={loadResidentData}
+      />
+
+      <FilePreviewModal
+        file={previewFile}
+        open={isPreviewOpen}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open) {
+            setPreviewFile(null);
+          }
+        }}
+      />
     </div>
   );
 }

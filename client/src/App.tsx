@@ -8,9 +8,8 @@ import Register from "@/pages/Register";
 import VerifyEmail from "@/pages/VerifyEmail";
 import OnboardResident from "@/pages/OnboardResident";
 import House from "@/pages/House";
-import Resident from "@/pages/Resident";
-import TrackerDashboard from "@/pages/TrackerDashboard";
 import ResidentDashboard from "@/pages/ResidentDashboard";
+import TrackerDashboard from "@/pages/TrackerDashboard";
 import GoalTracker from "@/pages/GoalTracker";
 import ChecklistTracker from "@/pages/ChecklistTracker";
 import ChoreTracker from "@/pages/ChoreTracker";
@@ -58,9 +57,9 @@ function Router() {
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/dashboard" component={House} />
       <Route path="/dashboard/onboard" component={OnboardResident} />
-      <Route path="/resident/:id" component={Resident} />
+      <Route path="/resident/:id" component={ResidentDashboard} />
       <Route path="/resident/:id/trackers" component={TrackerDashboard} />
-      {/* New sidebar-based dashboard routes */}
+      {/* Sidebar-based dashboard routes */}
       <Route path="/resident/:id/dashboard" component={ResidentDashboard} />
       <Route path="/resident/:id/goals" component={ResidentDashboard} />
       <Route path="/resident/:id/checklist" component={ResidentDashboard} />
