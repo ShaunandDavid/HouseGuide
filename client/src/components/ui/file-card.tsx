@@ -5,7 +5,15 @@ import { Button } from "@/components/ui/button";
 import type { FileRecord } from "@shared/schema";
 // Helper function to get file URL
 const getFileUrl = (file: FileRecord) => {
-  return file.url;
+  const rawUrl = file.url || "";
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+    return rawUrl;
+  }
+  if (rawUrl.startsWith("/")) {
+    return rawUrl;
+  }
+  return `/${rawUrl}`;
 };
 
 interface FileCardProps {

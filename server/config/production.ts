@@ -3,11 +3,11 @@ export const productionConfig = {
   // Security settings
   security: {
     jwtSecret: process.env.JWT_SECRET!,
-    jwtExpiry: '24h',
+    jwtExpiry: '30d',
     bcryptRounds: 12,
     maxLoginAttempts: 5,
     lockoutDuration: 15 * 60 * 1000, // 15 minutes
-    sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours
+    sessionTimeout: 30 * 24 * 60 * 60 * 1000, // 30 days
   },
 
   // Database configuration

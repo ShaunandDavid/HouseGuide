@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Camera, X, Mic, Square, Loader2 } from "lucide-react";
 import { processImageWithOCR } from "@/lib/tesseract";
 import { classifyDocumentByKeywords } from "@/lib/classify";
-import { uploadFile, createNote, createGoal, createIncident, transcribeVoiceNote } from "@/lib/api";
+import { uploadFile, createNote, createGoal, createIncident, transcribeVoiceNote, requestOcr } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/api";
 import { autoPopulateTrackers } from "@/lib/auto-populate";
@@ -194,7 +194,20 @@ export function DocumentScanModal({
     setVerificationText('');
 
     try {
-      const result = await processImageWithOCR(file, setOcrProgress);
+      let result: { text: string; confidence: number };
+
+      try {
+        result = await processImageWithOCR(file, setOcrProgress);
+      } catch (error) {
+        toast({
+          title: "Switching to Cloud OCR",
+          description: "Device OCR failed. Running secure OCR in the background.",
+        });
+        setOcrProgress(0.1);
+        result = await requestOcr(file);
+        setOcrProgress(1);
+      }
+
       const cleanedText = result.text?.trim() || '';
       const isLowQuality = cleanedText.length > 0 && (result.confidence < MIN_OCR_CONFIDENCE || cleanedText.length < MIN_OCR_TEXT_CHARS);
 
@@ -444,6 +457,7 @@ export function DocumentScanModal({
             severity: 'medium',
             description: verificationNote,
             dateOccurred: today,
+            followUpRequired: false,
             createdBy: currentUser.id
           });
         }

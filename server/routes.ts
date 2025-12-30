@@ -6,11 +6,12 @@ import { sendEmail, generateVerificationEmail } from "./email";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { 
-  insertGuideSchema, insertHouseSchema, insertResidentSchema, insertFileSchema,
+  insertOrganizationSchema, insertOrgUserSchema, insertGuideSchema, insertHouseSchema, insertResidentSchema, insertFileSchema,
   insertReportSchema, insertGoalSchema, insertChecklistSchema, insertChoreSchema,
   insertAccomplishmentSchema, insertIncidentSchema, insertMeetingSchema, insertProgramFeeSchema, insertNoteSchema,
-  insertWeeklyReportSchema
+  insertWeeklyReportSchema, updateNoteSchema
 } from "@shared/schema";
+import type { Guide } from "@shared/schema";
 import { readFileSync } from "fs";
 import { join } from "path";
 import multer from 'multer';
@@ -21,6 +22,7 @@ import {
   ObjectStorageService,
   ObjectNotFoundError,
 } from "./objectStorage";
+import { SecurityUtils } from "./security";
 
 const readEnvNumber = (key: string, fallback: number) => {
   const raw = process.env[key];
@@ -75,6 +77,66 @@ const splitNotesByCategory = (notes: any[]) => {
   });
 
   return buckets;
+};
+
+const isOrgAdmin = (guide: any) => guide?.role === 'owner' || guide?.role === 'admin';
+
+const ensureGuideOrganization = async (guide: Guide): Promise<Guide> => {
+  if (guide.orgId) return guide;
+
+  const house = guide.houseId ? await storage.getHouse(guide.houseId) : undefined;
+  const orgName = house?.name || guide.houseName || 'HouseGuide';
+  let org = await storage.getOrganizationByName(orgName);
+  if (!org) {
+    org = await storage.createOrganization({ name: orgName });
+  }
+
+  if (house && !house.orgId) {
+    await storage.updateHouse(house.id, { orgId: org.id });
+  }
+
+  const updatedGuide = await storage.updateGuide(guide.id, {
+    orgId: org.id,
+    role: guide.role || 'owner',
+  });
+
+  return updatedGuide;
+};
+
+const ensureChatThreads = async (orgId: string, houseId?: string) => {
+  const threads = await storage.getChatThreadsByOrg(orgId);
+  const hasFamily = threads.some((thread) => thread.type === 'family');
+  if (!hasFamily) {
+    await storage.createChatThread({
+      orgId,
+      type: 'family',
+      name: 'Family Chat',
+    });
+  }
+
+  if (houseId) {
+    const existingHouseThread = await storage.getChatThreadByHouse(orgId, houseId);
+    if (!existingHouseThread) {
+      const house = await storage.getHouse(houseId);
+      await storage.createChatThread({
+        orgId,
+        houseId,
+        type: 'house',
+        name: house ? `${house.name} Thread` : 'House Thread',
+      });
+    }
+  }
+};
+
+const canAccessHouse = async (guide: any, houseId?: string) => {
+  if (!houseId) return false;
+  if (guide.role === 'guide') {
+    return guide.houseId === houseId;
+  }
+
+  const house = await storage.getHouse(houseId);
+  if (!house || !guide.orgId) return false;
+  return house.orgId === guide.orgId;
 };
 
 const VOICE_EXTENSION_BY_MIME: Record<string, string> = {
@@ -297,6 +359,57 @@ const transcribeVoiceAudio = async (file: Express.Multer.File): Promise<string> 
   }
 };
 
+const extractTextFromImage = async (file: Express.Multer.File): Promise<{ text: string; confidence: number }> => {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OpenAI API key not configured");
+  }
+
+  if (!file.mimetype?.startsWith("image/")) {
+    throw new Error("Unsupported file type for OCR");
+  }
+
+  const { OpenAI } = await import("openai");
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+  const completion = await client.chat.completions.create({
+    model: process.env.OCR_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+    temperature: 0,
+    max_tokens: 2000,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: "You are an OCR engine. Extract all readable text from images. Return JSON: {\"text\":\"...\",\"confidence\":0-100}.",
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Extract all readable text from this image. If no text, return empty text and confidence 0. Return JSON only." },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ],
+  });
+
+  const raw = completion.choices[0]?.message?.content?.trim();
+  if (!raw) {
+    return { text: "", confidence: 0 };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    const text = typeof parsed.text === "string" ? parsed.text.trim() : String(parsed.text || "").trim();
+    let confidence = Number(parsed.confidence ?? 0);
+    if (Number.isNaN(confidence)) confidence = 0;
+    if (confidence <= 1) confidence = confidence * 100;
+    confidence = Math.max(0, Math.min(100, confidence));
+    return { text, confidence };
+  } catch (error) {
+    return { text: raw, confidence: 50 };
+  }
+};
+
 const buildOverview = (weekData: any): string => {
   const checklist = weekData?.data?.checklist || {};
   const parts: string[] = [];
@@ -346,35 +459,42 @@ const buildOverview = (weekData: any): string => {
 };
 
 // Authentication middleware
-async function requireAuth(req: any, res: any, next: any) {
-  const token = req.cookies?.authToken;
-  if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  
-  try {
-    // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string;
-      email: string;
-      houseId: string;
-    };
-    
-    // Load user from database
-    const guide = await storage.getGuide(decoded.userId);
-    if (!guide) {
-      console.error('AUTH: User not found:', decoded.userId);
-      return res.status(401).json({ error: 'NOT_FOUND: User not found' });
+  async function requireAuth(req: any, res: any, next: any) {
+    const token = req.cookies?.authToken;
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
     
-    if (!guide.isEmailVerified) {
-      console.error('AUTH: Email not verified for user:', decoded.email);
-      return res.status(401).json({ error: 'UNVERIFIED_EMAIL: Please verify your email' });
-    }
-    
-    // Attach guide info to request for house-scoped access
-    req.guide = guide;
-    next();
+    try {
+      // Verify JWT token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+        userId: string;
+        email: string;
+        houseId?: string;
+        orgId?: string;
+        role?: string;
+      };
+      
+      // Load user from database
+      let guide = await storage.getGuide(decoded.userId);
+      if (!guide) {
+        console.error('AUTH: User not found:', decoded.userId);
+        return res.status(401).json({ error: 'NOT_FOUND: User not found' });
+      }
+      
+      if (!guide.isEmailVerified) {
+        console.error('AUTH: Email not verified for user:', decoded.email);
+        return res.status(401).json({ error: 'UNVERIFIED_EMAIL: Please verify your email' });
+      }
+
+      guide = await ensureGuideOrganization(guide);
+      if (guide.orgId) {
+        await ensureChatThreads(guide.orgId, guide.houseId);
+      }
+
+      // Attach guide info to request for house-scoped access
+      req.guide = guide;
+      next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       console.error('AUTH: Invalid token -', error.message);
@@ -514,11 +634,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email and password are required" });
       }
 
-      const guide = await storage.getGuideByEmail(email.toLowerCase());
-      if (!guide) {
-        console.error(`LOGIN: NOT_FOUND - User not found: ${email}`);
-        return res.status(401).json({ error: "NOT_FOUND: Invalid credentials" });
-      }
+        let guide = await storage.getGuideByEmail(email.toLowerCase());
+        if (!guide) {
+          console.error(`LOGIN: NOT_FOUND - User not found: ${email}`);
+          return res.status(401).json({ error: "NOT_FOUND: Invalid credentials" });
+        }
 
       // Check if email is verified
       if (!guide.isEmailVerified) {
@@ -529,45 +649,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const isValidPassword = await bcrypt.compare(password, guide.password);
-      if (!isValidPassword) {
-        console.error(`LOGIN: INVALID_PASSWORD - Invalid password for: ${email}`);
-        return res.status(401).json({ error: "INVALID_PASSWORD: Invalid credentials" });
-      }
+        const isValidPassword = await bcrypt.compare(password, guide.password);
+        if (!isValidPassword) {
+          console.error(`LOGIN: INVALID_PASSWORD - Invalid password for: ${email}`);
+          return res.status(401).json({ error: "INVALID_PASSWORD: Invalid credentials" });
+        }
 
-      // Validate that user has a house
-      if (!guide.houseId) {
-        console.error(`LOGIN: NO_HOUSE - User has no houseId: ${email}`);
-        return res.status(500).json({ error: "Account setup incomplete. Please contact support." });
-      }
+        guide = await ensureGuideOrganization(guide);
 
-      // Verify the house exists
-      const house = await storage.getHouse(guide.houseId);
-      if (!house) {
-        console.error(`LOGIN: HOUSE_NOT_FOUND - House ${guide.houseId} not found for user: ${email}`);
-        return res.status(500).json({ error: "Facility not found. Please contact support." });
-      }
+        // Validate that guide users have a house assigned
+        if (!guide.houseId && guide.role === 'guide') {
+          console.error(`LOGIN: NO_HOUSE - User has no houseId: ${email}`);
+          return res.status(500).json({ error: "Account setup incomplete. Please contact support." });
+        }
 
-      console.log(`LOGIN: House verified - ID: ${house.id}, Name: ${house.name}`);
+        // Verify the house exists if assigned
+        if (guide.houseId) {
+          const house = await storage.getHouse(guide.houseId);
+          if (!house) {
+            console.error(`LOGIN: HOUSE_NOT_FOUND - House ${guide.houseId} not found for user: ${email}`);
+            return res.status(500).json({ error: "Facility not found. Please contact support." });
+          }
+          console.log(`LOGIN: House verified - ID: ${house.id}, Name: ${house.name}`);
+        }
+
+        if (guide.orgId) {
+          await ensureChatThreads(guide.orgId, guide.houseId);
+        }
 
       // Create JWT token
-      const token = jwt.sign(
-        { userId: guide.id, email: guide.email, houseId: guide.houseId },
-        process.env.JWT_SECRET!, 
-        { expiresIn: "24h" }
-      );
+        const token = jwt.sign(
+          { userId: guide.id, email: guide.email, houseId: guide.houseId, orgId: guide.orgId, role: guide.role },
+          process.env.JWT_SECRET!, 
+          { expiresIn: "30d" }
+        );
 
       // strip password
       const { password: _pw, ...userWithoutPassword } = guide;
 
       // ⬇⬇ Cross-site cookie: required when FRONTEND_URL != API origin
-      res.cookie("authToken", token, {
-        httpOnly: true,
-        secure: true,        // REQUIRED with SameSite=None
-        sameSite: "none",    // cross-origin
-        path: "/",
-        maxAge: 24 * 60 * 60 * 1000
-      });
+        res.cookie("authToken", token, {
+          httpOnly: true,
+          secure: true,        // REQUIRED with SameSite=None
+          sameSite: "none",    // cross-origin
+          path: "/",
+          maxAge: 30 * 24 * 60 * 60 * 1000
+        });
 
       // single JSON response (no duplicates below this)
       return res.json({ success: true, user: userWithoutPassword });
@@ -579,7 +706,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const validatedData = insertGuideSchema.parse(req.body);
+        const incomingData = { ...req.body };
+        if (!incomingData.organizationName) {
+          incomingData.organizationName = incomingData.houseName || `${incomingData.name || 'HouseGuide'} Organization`;
+        }
+        if (!incomingData.houseName) {
+          incomingData.houseName = `${incomingData.organizationName} House`;
+        }
+        const validatedData = insertGuideSchema.parse(incomingData);
       
       // Log DB check
       console.log('SIGNUP: Checking database connection...');
@@ -592,24 +726,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: "User already exists" });
       }
 
-      // First create the house
-      const house = await storage.createHouse({
-        name: validatedData.houseName
-      });
-      
-      console.log(`SIGNUP: Created house - ID: ${house.id}, Name: ${house.name}`);
+        // Hash password and create guide
+        const hashedPassword = await bcrypt.hash(validatedData.password, 12);
+        const guide = await storage.createGuide({
+          ...validatedData,
+          password: hashedPassword
+        });
+        
+        const updatedGuide = guide;
+        
+        console.log(`SIGNUP: Created user - ID: ${updatedGuide.id}, Email: ${updatedGuide.email}, HouseID: ${updatedGuide.houseId}, Verified: ${updatedGuide.isEmailVerified}`);
 
-      // Hash password and create guide
-      const hashedPassword = await bcrypt.hash(validatedData.password, 12);
-      const guide = await storage.createGuide({
-        ...validatedData,
-        password: hashedPassword
-      });
-      
-      // Update guide with houseId and get updated guide
-      const updatedGuide = await storage.updateGuide(guide.id, { houseId: house.id });
-      
-      console.log(`SIGNUP: Created user - ID: ${updatedGuide.id}, Email: ${updatedGuide.email}, HouseID: ${updatedGuide.houseId}, Verified: ${updatedGuide.isEmailVerified}`);
+        if (updatedGuide.orgId) {
+          await ensureChatThreads(updatedGuide.orgId, updatedGuide.houseId);
+        }
 
       // Send verification email
       const resolvedBaseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.headers.host}`;
@@ -691,13 +821,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logout endpoint
-  app.post("/api/auth/logout", (req, res) => {
-    res.clearCookie('authToken');
-    res.json({ success: true });
-  });
+    // Logout endpoint
+    app.post("/api/auth/logout", (req, res) => {
+      res.clearCookie('authToken');
+      res.json({ success: true });
+    });
 
-  // Houses endpoints (protected)
+    app.get("/api/auth/pin/status", requireAuth, async (req: any, res) => {
+      res.json({ enabled: !!req.guide.pinHash });
+    });
+
+    app.post("/api/auth/pin", requireAuth, async (req: any, res) => {
+      try {
+        const { pin } = req.body || {};
+        if (!pin || typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+          return res.status(400).json({ error: "PIN must be 4-8 digits" });
+        }
+
+        const pinHash = await SecurityUtils.hashData(pin);
+        const updatedGuide = await storage.updateGuide(req.guide.id, { pinHash });
+        res.json({ success: true, enabled: !!updatedGuide.pinHash });
+      } catch (error) {
+        console.error('Set PIN error:', error);
+        res.status(500).json({ error: "Failed to set PIN" });
+      }
+    });
+
+    app.post("/api/auth/pin/verify", requireAuth, async (req: any, res) => {
+      try {
+        const { pin } = req.body || {};
+        if (!pin || typeof pin !== 'string') {
+          return res.status(400).json({ error: "PIN is required" });
+        }
+
+        const guide = await storage.getGuide(req.guide.id);
+        if (!guide?.pinHash) {
+          return res.status(404).json({ error: "PIN not set" });
+        }
+
+        const isValid = await SecurityUtils.verifyHash(pin, guide.pinHash);
+        res.json({ valid: isValid });
+      } catch (error) {
+        console.error('Verify PIN error:', error);
+        res.status(500).json({ error: "Failed to verify PIN" });
+      }
+    });
+
+    // Organization endpoints (protected)
+    app.get("/api/orgs/current", requireAuth, async (req: any, res) => {
+      try {
+        if (!req.guide.orgId) {
+          return res.status(400).json({ error: "Organization not set for this account" });
+        }
+
+        const [org, houses] = await Promise.all([
+          storage.getOrganization(req.guide.orgId),
+          storage.getHousesByOrg(req.guide.orgId)
+        ]);
+
+        if (!org) {
+          return res.status(404).json({ error: "Organization not found" });
+        }
+
+        res.json({ org, houses, role: req.guide.role });
+      } catch (error) {
+        console.error('Get org error:', error);
+        res.status(500).json({ error: "Failed to fetch organization" });
+      }
+    });
+
+    app.patch("/api/orgs/:id", requireAuth, async (req: any, res) => {
+      try {
+        const { id } = req.params;
+        if (!req.guide.orgId || req.guide.orgId !== id) {
+          return res.status(403).json({ error: "Unauthorized to update this organization" });
+        }
+        if (!isOrgAdmin(req.guide)) {
+          return res.status(403).json({ error: "Admin access required" });
+        }
+
+        const validatedData = insertOrganizationSchema.partial().parse(req.body);
+        const org = await storage.updateOrganization(id, validatedData);
+        res.json(org);
+      } catch (error) {
+        console.error('Update org error:', error);
+        res.status(500).json({ error: "Failed to update organization" });
+      }
+    });
+
+    app.post("/api/orgs/houses", requireAuth, async (req: any, res) => {
+      try {
+        if (!req.guide.orgId) {
+          return res.status(400).json({ error: "Organization not set for this account" });
+        }
+        if (!isOrgAdmin(req.guide)) {
+          return res.status(403).json({ error: "Admin access required" });
+        }
+
+        const validatedData = insertHouseSchema.parse({ ...req.body, orgId: req.guide.orgId });
+        const house = await storage.createHouse(validatedData);
+        await ensureChatThreads(req.guide.orgId, house.id);
+        res.status(201).json(house);
+      } catch (error) {
+        console.error('Create house error:', error);
+        res.status(500).json({ error: "Failed to create house" });
+      }
+    });
+
+    app.post("/api/orgs/users", requireAuth, async (req: any, res) => {
+      try {
+        if (!req.guide.orgId) {
+          return res.status(400).json({ error: "Organization not set for this account" });
+        }
+        if (!isOrgAdmin(req.guide)) {
+          return res.status(403).json({ error: "Admin access required" });
+        }
+
+        const validatedData = insertOrgUserSchema.parse({
+          ...req.body,
+          orgId: req.guide.orgId,
+        });
+
+        if (validatedData.role === 'guide' && !validatedData.houseId && !validatedData.houseName) {
+          return res.status(400).json({ error: "House assignment is required for guides" });
+        }
+
+        const existing = await storage.getGuideByEmail(validatedData.email);
+        if (existing) {
+          return res.status(409).json({ error: "User already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(validatedData.password, 12);
+        const guide = await storage.createOrgUser({
+          ...validatedData,
+          password: hashedPassword,
+        });
+
+        if (guide.orgId) {
+          await ensureChatThreads(guide.orgId, guide.houseId);
+        }
+
+        const resolvedBaseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.headers.host}`;
+        const baseUrl = resolvedBaseUrl.replace(/\/$/, '');
+
+        let emailSent = false;
+        if (guide.verificationToken) {
+          const emailParams = generateVerificationEmail(
+            guide.email,
+            guide.verificationToken,
+            guide.houseName,
+            baseUrl
+          );
+          emailSent = await sendEmail(emailParams);
+        }
+
+        res.status(201).json({
+          id: guide.id,
+          email: guide.email,
+          role: guide.role,
+          houseId: guide.houseId,
+          emailSent,
+        });
+      } catch (error) {
+        console.error('Create org user error:', error);
+        res.status(500).json({ error: "Failed to create user" });
+      }
+    });
+
+    // Houses endpoints (protected)
   app.get("/api/houses/:idOrName", requireAuth, async (req, res) => {
     try {
       const { idOrName } = req.params;
@@ -721,6 +1012,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!house) {
         return res.status(404).json({ error: "House not found" });
       }
+      if (req.guide.role === 'guide' && req.guide.houseId !== house.id) {
+        return res.status(403).json({ error: "Unauthorized to access this house" });
+      }
+      if (req.guide.role !== 'guide' && req.guide.orgId && house.orgId && house.orgId !== req.guide.orgId) {
+        return res.status(403).json({ error: "Unauthorized to access this house" });
+      }
       res.json(house);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -732,8 +1029,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/houses", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertHouseSchema.parse(req.body);
+      if (!req.guide.orgId) {
+        return res.status(400).json({ error: "Organization not set for this account" });
+      }
+      if (!isOrgAdmin(req.guide)) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const validatedData = insertHouseSchema.parse({ ...req.body, orgId: req.guide.orgId });
       const house = await storage.createHouse(validatedData);
+      await ensureChatThreads(req.guide.orgId, house.id);
       res.status(201).json(house);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -743,9 +1048,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/houses/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!id || id.length > 80) {
+        return res.status(400).json({ error: "Invalid house ID" });
+      }
+
+      const house = await storage.getHouse(id);
+      if (!house) {
+        return res.status(404).json({ error: "House not found" });
+      }
+
+      if (req.guide.role === 'guide' && req.guide.houseId !== id) {
+        return res.status(403).json({ error: "Unauthorized to update this house" });
+      }
+      if (req.guide.role !== 'guide' && req.guide.orgId && house.orgId && house.orgId !== req.guide.orgId) {
+        return res.status(403).json({ error: "Unauthorized to update this house" });
+      }
+
+      const validatedData = insertHouseSchema.partial().parse(req.body);
+      const updatedHouse = await storage.updateHouse(id, validatedData);
+      res.json(updatedHouse);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Update house error:', error);
+      }
+      res.status(500).json({ error: "Failed to update house" });
+    }
+  });
+
   app.get("/api/houses", requireAuth, async (req, res) => {
     try {
-      const houses = await storage.getAllHouses();
+      if (!req.guide.orgId) {
+        return res.status(400).json({ error: "Organization not set for this account" });
+      }
+      const houses = await storage.getHousesByOrg(req.guide.orgId);
       res.json(houses);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -763,12 +1101,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!houseId || houseId.length > 50) {
         return res.status(400).json({ error: "Invalid house ID" });
       }
+      const hasAccess = await canAccessHouse(req.guide, houseId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Unauthorized to access this house" });
+      }
       const residents = await storage.getResidentsByHouse(houseId);
       res.json(residents);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error('Get residents by house error:', error);
       }
+      res.status(500).json({ error: "Failed to fetch residents" });
+    }
+  });
+
+  app.get("/api/residents/for-chat", requireAuth, async (req, res) => {
+    try {
+      if (req.guide.role === 'guide') {
+        if (!req.guide.houseId) {
+          return res.status(400).json({ error: "House not assigned for this account" });
+        }
+        const residents = await storage.getResidentsByHouse(req.guide.houseId);
+        return res.json(residents);
+      }
+
+      if (!req.guide.orgId) {
+        return res.status(400).json({ error: "Organization not set for this account" });
+      }
+
+      const houses = await storage.getHousesByOrg(req.guide.orgId);
+      const residentsByHouse = await Promise.all(
+        houses.map(async (house) => {
+          const residents = await storage.getResidentsByHouse(house.id);
+          return residents.map(resident => ({ ...resident, houseName: house.name }));
+        })
+      );
+      const residents = residentsByHouse.flat();
+      res.json(residents);
+    } catch (error) {
+      console.error('Get residents for chat error:', error);
       res.status(500).json({ error: "Failed to fetch residents" });
     }
   });
@@ -784,6 +1155,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!resident) {
         return res.status(404).json({ error: "Resident not found" });
       }
+      const hasAccess = await canAccessHouse(req.guide, resident.house);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Unauthorized to access this resident" });
+      }
       res.json(resident);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -797,8 +1172,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertResidentSchema.parse(req.body);
       
-      // Ensure resident is assigned to the guide's house (security)
-      validatedData.house = req.guide.houseId!;
+      if (req.guide.role === 'guide') {
+        // Ensure resident is assigned to the guide's house (security)
+        validatedData.house = req.guide.houseId!;
+      } else {
+        const targetHouse = validatedData.house || req.guide.houseId;
+        const hasAccess = await canAccessHouse(req.guide, targetHouse);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Unauthorized to add resident to this house" });
+        }
+        validatedData.house = targetHouse!;
+      }
       
       const resident = await storage.createResident(validatedData);
       res.status(201).json(resident);
@@ -813,7 +1197,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/residents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const existing = await storage.getResident(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Resident not found" });
+      }
+      const hasAccess = await canAccessHouse(req.guide, existing.house);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Unauthorized to update this resident" });
+      }
+
       const validatedData = insertResidentSchema.partial().parse(req.body);
+      if (req.guide.role === 'guide') {
+        delete (validatedData as any).house;
+      }
       const resident = await storage.updateResident(id, validatedData);
       res.json(resident);
     } catch (error) {
@@ -827,6 +1223,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/residents/:id", requireAuth, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const existing = await storage.getResident(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Resident not found" });
+      }
+      const hasAccess = await canAccessHouse(req.guide, existing.house);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Unauthorized to delete this resident" });
+      }
       await storage.deleteResident(id);
       res.status(204).send();
     } catch (error) {
@@ -898,6 +1302,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+
+  const ocrUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype?.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid image file type.'));
+      }
+    }
+  });
   
   // Multipart file upload endpoint
   app.post("/api/files/upload", requireAuth, upload.single('file'), async (req: any, res) => {
@@ -955,6 +1373,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('File upload error:', error);
       }
       res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  app.post("/api/ocr", requireAuth, ocrUpload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const result = await extractTextFromImage(req.file);
+      res.json(result);
+    } catch (error) {
+      console.error("OCR processing error:", error);
+      res.status(500).json({ error: "Failed to process image for OCR" });
     }
   });
   
@@ -1575,6 +2007,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/notes/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = updateNoteSchema.parse(req.body);
+      const note = await storage.updateNote(id, validatedData);
+      res.json(note);
+    } catch (error) {
+      console.error('Update note error:', error);
+      res.status(500).json({ error: "Failed to update note" });
+    }
+  });
+
 
   app.post("/api/notes/voice-note", requireAuth, voiceUpload.single('audio'), async (req: any, res) => {
     try {
@@ -1601,8 +2045,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Voice Note Categorization (AI-powered)
-  app.post("/api/notes/categorize-voice", requireAuth, async (req: any, res) => {
-    try {
+    app.post("/api/notes/categorize-voice", requireAuth, async (req: any, res) => {
+      try {
       const { transcript, residentId } = req.body;
 
       if (!transcript || typeof transcript !== 'string') {
@@ -1616,11 +2060,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error) {
       console.error('Voice note categorization error:', error);
-      res.status(500).json({ error: "Failed to categorize voice note" });
-    }
-  });
+        res.status(500).json({ error: "Failed to categorize voice note" });
+      }
+    });
 
-  // Weekly Reports endpoints (AI Generated Reports)
+    // Chat endpoints (org-wide + house threads)
+    app.get("/api/chat/threads", requireAuth, async (req: any, res) => {
+      try {
+        if (!req.guide.orgId) {
+          return res.status(400).json({ error: "Organization not set for this account" });
+        }
+        await ensureChatThreads(req.guide.orgId, req.guide.houseId);
+        const threads = await storage.getChatThreadsByOrg(req.guide.orgId);
+        const sorted = threads.sort((a, b) => {
+          if (a.type === b.type) return a.name.localeCompare(b.name);
+          return a.type === 'family' ? -1 : 1;
+        });
+        res.json(sorted);
+      } catch (error) {
+        console.error('Get chat threads error:', error);
+        res.status(500).json({ error: "Failed to fetch chat threads" });
+      }
+    });
+
+    const getThreadForGuide = async (threadId: string, guide: any) => {
+      const thread = await storage.getChatThread(threadId);
+      if (!thread) return null;
+      if (!guide.orgId || thread.orgId !== guide.orgId) return null;
+      if (thread.type === 'house' && guide.role === 'guide' && guide.houseId !== thread.houseId) return null;
+      return thread;
+    };
+
+    app.get("/api/chat/threads/:threadId/messages", requireAuth, async (req: any, res) => {
+      try {
+        const { threadId } = req.params;
+        const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+        const offset = Math.max(0, Number(req.query.offset) || 0);
+
+        const thread = await getThreadForGuide(threadId, req.guide);
+        if (!thread) {
+          return res.status(404).json({ error: "Chat thread not found" });
+        }
+
+        const messages = await storage.getChatMessagesByThread(threadId, limit, offset);
+        const messagesWithAttachments = await Promise.all(
+          messages.map(async (message) => {
+            const attachments = await storage.getChatAttachmentsByMessage(message.id);
+            return { ...message, attachments };
+          })
+        );
+
+        res.json({ thread, messages: messagesWithAttachments });
+      } catch (error) {
+        console.error('Get chat messages error:', error);
+        res.status(500).json({ error: "Failed to fetch chat messages" });
+      }
+    });
+
+    app.post("/api/chat/threads/:threadId/messages", requireAuth, async (req: any, res) => {
+      try {
+        const { threadId } = req.params;
+        const { body, messageType, residentId } = req.body || {};
+
+        if (!body || typeof body !== 'string' || body.trim().length === 0) {
+          return res.status(400).json({ error: "Message body is required" });
+        }
+
+        const thread = await getThreadForGuide(threadId, req.guide);
+        if (!thread) {
+          return res.status(404).json({ error: "Chat thread not found" });
+        }
+
+        const message = await storage.createChatMessage({
+          threadId: thread.id,
+          orgId: thread.orgId,
+          houseId: thread.houseId,
+          residentId: residentId || undefined,
+          senderId: req.guide.id,
+          body: body.trim(),
+          messageType: messageType === 'report' ? 'report' : 'text',
+        });
+
+        res.status(201).json({ ...message, attachments: [] });
+      } catch (error) {
+        console.error('Create chat message error:', error);
+        res.status(500).json({ error: "Failed to send message" });
+      }
+    });
+
+    app.post("/api/chat/threads/:threadId/attachments", requireAuth, upload.single('file'), async (req: any, res) => {
+      try {
+        const { threadId } = req.params;
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        const thread = await getThreadForGuide(threadId, req.guide);
+        if (!thread) {
+          return res.status(404).json({ error: "Chat thread not found" });
+        }
+
+        const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+        const messageType = req.body?.messageType === 'report' ? 'report' : 'text';
+
+        const message = await storage.createChatMessage({
+          threadId: thread.id,
+          orgId: thread.orgId,
+          houseId: thread.houseId,
+          residentId: req.body?.residentId || undefined,
+          senderId: req.guide.id,
+          body: body || 'Attachment',
+          messageType,
+        });
+
+        const fileUrl = `/uploads/${req.file.filename}`;
+        const attachment = await storage.createChatAttachment({
+          messageId: message.id,
+          url: fileUrl,
+          filename: req.file.originalname,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+        });
+
+        res.status(201).json({ ...message, attachments: [attachment] });
+      } catch (error) {
+        console.error('Create chat attachment error:', error);
+        res.status(500).json({ error: "Failed to upload attachment" });
+      }
+    });
+
+    app.post("/api/chat/threads/:threadId/voice", requireAuth, voiceUpload.single('audio'), async (req: any, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "Audio file is required" });
+        }
+
+        const { threadId } = req.params;
+        const thread = await getThreadForGuide(threadId, req.guide);
+        if (!thread) {
+          return res.status(404).json({ error: "Chat thread not found" });
+        }
+
+        const transcript = await transcribeVoiceAudio(req.file);
+        if (!transcript) {
+          return res.status(422).json({ error: "Unable to transcribe audio" });
+        }
+
+        const messageType = req.body?.messageType === 'report' ? 'report' : 'text';
+        const message = await storage.createChatMessage({
+          threadId: thread.id,
+          orgId: thread.orgId,
+          houseId: thread.houseId,
+          residentId: req.body?.residentId || undefined,
+          senderId: req.guide.id,
+          body: transcript,
+          messageType,
+        });
+
+        res.status(201).json({ ...message, attachments: [] });
+      } catch (error) {
+        console.error('Chat voice message error:', error);
+        res.status(500).json({ error: "Failed to process voice message" });
+      }
+    });
+
+    app.post("/api/chat/reports/generate", requireAuth, async (req: any, res) => {
+      try {
+        const { threadId, residentId, startDate, endDate } = req.body || {};
+        if (!threadId || !residentId || !startDate || !endDate) {
+          return res.status(400).json({ error: "threadId, residentId, startDate, endDate are required" });
+        }
+
+        const thread = await getThreadForGuide(threadId, req.guide);
+        if (!thread) {
+          return res.status(404).json({ error: "Chat thread not found" });
+        }
+
+        const resident = await storage.getResident(residentId);
+        if (!resident) {
+          return res.status(404).json({ error: "Resident not found" });
+        }
+
+        const hasAccess = await canAccessHouse(req.guide, resident.house);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Unauthorized to access this resident" });
+        }
+
+        const messages = await storage.getChatMessagesByThread(threadId, 500, 0);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const reportMessages = messages.filter(message => {
+          const createdAt = new Date(message.created);
+          return message.residentId === residentId
+            && message.messageType === 'report'
+            && createdAt >= start
+            && createdAt <= end;
+        });
+
+        const lines = reportMessages.map(message => {
+          const date = new Date(message.created).toLocaleDateString();
+          return `- ${date}: ${message.body}`;
+        });
+
+        const header = `${resident.firstName} ${resident.lastInitial}.`;
+        const reportText = [
+          header,
+          `Report Window: ${startDate} to ${endDate}`,
+          '',
+          lines.length ? lines.join('\n') : 'No report entries recorded in this range.',
+        ].join('\n');
+
+        res.json({ reportText, count: reportMessages.length });
+      } catch (error) {
+        console.error('Generate chat report error:', error);
+        res.status(500).json({ error: "Failed to generate report" });
+      }
+    });
+
+    // Weekly Reports endpoints (AI Generated Reports)
   app.get("/api/reports/weekly/by-resident/:residentId", requireAuth, async (req: any, res) => {
     try {
       const { residentId } = req.params;
@@ -1682,7 +2339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Collect all data for the week
-      const [goals, chores, accomplishments, incidents, meetings, programFees, notes, checklist] = await Promise.all([
+      const [goals, chores, accomplishments, incidents, meetings, programFees, notes, files, checklist] = await Promise.all([
         storage.getGoalsByResident(residentId),
         storage.getChoresByResident(residentId),
         storage.getAccomplishmentsByResident(residentId),
@@ -1690,6 +2347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getMeetingsByResident(residentId),
         storage.getProgramFeesByResident(residentId),
         storage.getNotesByResident(residentId),
+        storage.getFilesByResident(residentId),
         storage.getChecklistByResident(residentId)
       ]);
 
@@ -1699,10 +2357,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const filterByWeek = (items: any[], dateField: string) => {
         return items.filter(item => {
-          const itemDate = new Date(item[dateField] || item.created);
-          return itemDate >= weekStartDate && itemDate <= weekEndDate;
+          const candidateDates = [
+            item?.[dateField],
+            item?.updated,
+            item?.created
+          ].filter(Boolean);
+
+          return candidateDates.some((value: string) => {
+            const itemDate = new Date(value);
+            return itemDate >= weekStartDate && itemDate <= weekEndDate;
+          });
         });
       };
+
+      const organization = house.orgId ? await storage.getOrganization(house.orgId) : undefined;
 
       const weekData = {
         resident: {
@@ -1712,8 +2380,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         house: {
           id: house.id,
-          name: house.name
+          name: house.name,
+          rules: house.rules
         },
+        organization: organization
+          ? {
+              id: organization.id,
+              name: organization.name,
+              defaultRules: organization.defaultRules,
+            }
+          : undefined,
         period: {
           weekStart,
           weekEnd
@@ -1726,6 +2402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meetings: filterByWeek(meetings, 'dateAttended'),
           programFees: filterByWeek(programFees, 'dueDate'),
           notes: filterByWeek(notes, 'created'),
+          files: filterByWeek(files, 'created'),
           checklist: checklist // Include current checklist status
         }
       };
@@ -1752,7 +2429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback to basic template
         // Use the original perfect template format
         const overview = buildOverview(weekData);
-        const checklist = weekData.data.checklist || {};
+        const checklist = (weekData.data.checklist || {}) as any;
         const notesByCategory = splitNotesByCategory(weekData.data.notes);
 
         const sponsorItems = [];
@@ -1875,15 +2552,25 @@ __House Guide Observations:__ ${observations}`;
       
       const filterByWeek = (items: any[], dateField: string) => {
         return items.filter(item => {
-          const itemDate = new Date(item[dateField] || item.created);
-          return itemDate >= weekStartDate && itemDate <= weekEndDate;
+          const candidateDates = [
+            item?.[dateField],
+            item?.updated,
+            item?.created
+          ].filter(Boolean);
+
+          return candidateDates.some((value: string) => {
+            const itemDate = new Date(value);
+            return itemDate >= weekStartDate && itemDate <= weekEndDate;
+          });
         });
       };
+
+      const organization = house.orgId ? await storage.getOrganization(house.orgId) : undefined;
 
       // Collect comprehensive data for all residents
       const residentReports = await Promise.all(
         activeResidents.map(async (resident) => {
-          const [goals, chores, accomplishments, incidents, meetings, programFees, notes, checklist] = await Promise.all([
+          const [goals, chores, accomplishments, incidents, meetings, programFees, notes, files, checklist] = await Promise.all([
             storage.getGoalsByResident(resident.id),
             storage.getChoresByResident(resident.id),
             storage.getAccomplishmentsByResident(resident.id),
@@ -1891,6 +2578,7 @@ __House Guide Observations:__ ${observations}`;
             storage.getMeetingsByResident(resident.id),
             storage.getProgramFeesByResident(resident.id),
             storage.getNotesByResident(resident.id),
+            storage.getFilesByResident(resident.id),
             storage.getChecklistByResident(resident.id)
           ]);
 
@@ -1902,8 +2590,16 @@ __House Guide Observations:__ ${observations}`;
             },
             house: {
               id: house.id,
-              name: house.name
+              name: house.name,
+              rules: house.rules
             },
+            organization: organization
+              ? {
+                  id: organization.id,
+                  name: organization.name,
+                  defaultRules: organization.defaultRules,
+                }
+              : undefined,
             period: {
               weekStart,
               weekEnd
@@ -1916,6 +2612,7 @@ __House Guide Observations:__ ${observations}`;
               meetings: filterByWeek(meetings, 'dateAttended'),
               programFees: filterByWeek(programFees, 'dueDate'),
               notes: filterByWeek(notes, 'created'),
+              files: filterByWeek(files, 'created'),
               checklist: checklist
             }
           };
@@ -1941,7 +2638,7 @@ __House Guide Observations:__ ${observations}`;
             console.log('AI generation failed for resident, using template fallback:', aiError);
             // Fallback to basic template
             const overview = buildOverview({ data: weekData.data });
-            const checklist = weekData.data.checklist || {};
+            const checklist = (weekData.data.checklist || {}) as any;
             const notesByCategory = splitNotesByCategory(weekData.data.notes);
 
             const sponsorItems = [];

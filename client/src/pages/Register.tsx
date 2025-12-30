@@ -16,6 +16,7 @@ export default function Register() {
     password: "",
     confirmPassword: "",
     name: "",
+    organizationName: "",
     houseName: ""
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function Register() {
     e.preventDefault();
     
     // Validation
-    if (!formData.email || !formData.password || !formData.name) {
+    if (!formData.email || !formData.password || !formData.name || !formData.organizationName || !formData.houseName) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -72,7 +73,8 @@ export default function Register() {
           email: formData.email,
           password: formData.password,
           name: formData.name,
-          houseName: `${formData.name}'s Dashboard`
+          organizationName: formData.organizationName,
+          houseName: formData.houseName
         }),
         credentials: 'include',
       });
@@ -177,6 +179,36 @@ export default function Register() {
                   placeholder="Enter your full name"
                   disabled={isLoading}
                   data-testid="input-name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="organizationName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Organization Name *
+                </Label>
+                <Input
+                  id="organizationName"
+                  type="text"
+                  value={formData.organizationName}
+                  onChange={(e) => handleInputChange('organizationName', e.target.value)}
+                  placeholder="Crossroads Recovery"
+                  disabled={isLoading}
+                  data-testid="input-organization-name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="houseName" className="block text-sm font-medium text-gray-700 mb-2">
+                  First House Name *
+                </Label>
+                <Input
+                  id="houseName"
+                  type="text"
+                  value={formData.houseName}
+                  onChange={(e) => handleInputChange('houseName', e.target.value)}
+                  placeholder="House 1"
+                  disabled={isLoading}
+                  data-testid="input-house-name"
                 />
               </div>
               

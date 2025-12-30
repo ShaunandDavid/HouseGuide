@@ -18,6 +18,12 @@ export interface WeeklyReportData {
   house: {
     id: string;
     name: string;
+    rules?: string;
+  };
+  organization?: {
+    id: string;
+    name: string;
+    defaultRules?: string;
   };
   period: {
     weekStart: string;
@@ -31,6 +37,7 @@ export interface WeeklyReportData {
     meetings: any[];
     programFees: any[];
     notes: any[];
+    files: any[];
     checklist: any;
   };
 }

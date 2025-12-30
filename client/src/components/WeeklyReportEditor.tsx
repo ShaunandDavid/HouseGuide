@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { generateWeeklyReport, createWeeklyReport, getAIStatus, getWeeklyReportsByResident } from '@/lib/api';
+import { generateWeeklyReport, createWeeklyReport, getAIStatus, getWeeklyReportsByResident, getCurrentUser } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -82,13 +82,21 @@ export function WeeklyReportEditor({ resident, onClose }: WeeklyReportEditorProp
   // Save report mutation
   const saveMutation = useMutation({
     mutationFn: (data: { title: string; body: string; weekStart: string; weekEnd: string; residentId: string }) =>
-      createWeeklyReport({
-        residentId: data.residentId,
-        title: data.title,
-        body: data.body,
-        weekStart: data.weekStart,
-        weekEnd: data.weekEnd,
-      }),
+      (() => {
+        const currentUser = getCurrentUser();
+        if (!currentUser?.houseId || !currentUser?.id) {
+          throw new Error('Missing user context. Please log in again.');
+        }
+        return createWeeklyReport({
+          residentId: data.residentId,
+          houseId: currentUser.houseId,
+          createdBy: currentUser.id,
+          title: data.title,
+          body: data.body,
+          weekStart: data.weekStart,
+          weekEnd: data.weekEnd,
+        });
+      })(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/reports/weekly/by-resident', resident.id] });
       toast({

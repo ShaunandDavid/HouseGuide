@@ -9,3 +9,5 @@ coverage/
 cache/
 .vercel/
 *.log
+.vscode/
+.claude/

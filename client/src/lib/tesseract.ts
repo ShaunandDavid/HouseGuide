@@ -73,6 +73,20 @@ const normalizeImageForOCR = async (imageFile: File): Promise<File> => {
   return new File([blob], `${normalizedName}.jpg`, { type: 'image/jpeg' });
 };
 
+const shouldBypassNormalization = (error: unknown): boolean => {
+  if (error instanceof DOMException && error.name === 'SecurityError') {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('insecure') ||
+    normalized.includes('security') ||
+    normalized.includes('canvas is not supported') ||
+    normalized.includes('unable to convert image')
+  );
+};
+
 export interface OCRResult {
   text: string;
   confidence: number;
@@ -82,13 +96,20 @@ export async function processImageWithOCR(
   imageFile: File,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> {
-  let imageUrl: string | null = null;
-  
   try {
-    const normalizedFile = await normalizeImageForOCR(imageFile);
-    imageUrl = URL.createObjectURL(normalizedFile);
-    
-    const { data } = await Tesseract.recognize(imageUrl, 'eng', {
+    let sourceFile: File | Blob = imageFile;
+    try {
+      sourceFile = await normalizeImageForOCR(imageFile);
+    } catch (error) {
+      if (shouldBypassNormalization(error)) {
+        console.warn('OCR normalization skipped due to browser restrictions:', error);
+        sourceFile = imageFile;
+      } else {
+        throw error;
+      }
+    }
+
+    const { data } = await Tesseract.recognize(sourceFile, 'eng', {
       logger: m => {
         if (m.status === 'recognizing text' && onProgress) {
           onProgress(m.progress);
@@ -106,8 +127,6 @@ export async function processImageWithOCR(
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(`Unable to process image: ${message}`);
   } finally {
-    if (imageUrl) {
-      URL.revokeObjectURL(imageUrl);
-    }
+    // No cleanup needed since we're passing the File/Blob directly.
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, Route, Switch } from "wouter";
-import { ArrowLeft, User, Camera, FileText, Mic, Wand2 } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, User, Camera, FileText, Mic, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,8 +16,10 @@ import { ComprehensiveVoiceNote } from "@/components/ComprehensiveVoiceNote";
 import { WeeklyReportEditor } from "@/components/WeeklyReportEditor";
 import { StatusManagementModal } from "@/components/StatusManagementModal";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
+import { WeeklyReportsArchive } from "@/components/WeeklyReportsArchive";
 
 // Import existing tracker components
+import TrackerDashboard from "./TrackerDashboard";
 import GoalTracker from "./GoalTracker";
 import ChecklistTracker from "./ChecklistTracker";
 import ChoreTracker from "./ChoreTracker";
@@ -180,6 +182,16 @@ export default function ResidentDashboard() {
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLocation(`/resident/${resident.id}`)}
+                  aria-label="Resident dashboard"
+                  className="flex-shrink-0"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                </Button>
                 
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <User className="text-primary w-4 h-4 sm:w-5 sm:h-5" />
@@ -211,12 +223,62 @@ export default function ResidentDashboard() {
               </div>
             </div>
           </div>
+          <div className="border-t bg-white px-3 sm:px-6 py-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowStatusModal(true)}
+              >
+                Status
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation(`/resident/${resident.id}/trackers`)}
+              >
+                Trackers
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation(`/resident/${resident.id}/notes`)}
+              >
+                Notes
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation(`/resident/${resident.id}/pictures`)}
+              >
+                Files
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation("/chat")}
+              >
+                <MessageSquare className="w-4 h-4 mr-1" />
+                Chat
+              </Button>
+              <Button
+                size="sm"
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => setShowReportEditor(true)}
+              >
+                Report
+              </Button>
+            </div>
+          </div>
         </header>
 
         {/* Content Area - Mobile First */}
         <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">
           <Switch>
             {/* Tracker Routes */}
+            <Route path="/resident/:id/trackers">
+              <TrackerDashboard embedded />
+            </Route>
             <Route path="/resident/:id/goals" component={GoalTracker} />
             <Route path="/resident/:id/checklist" component={ChecklistTracker} />
             <Route path="/resident/:id/chores" component={ChoreTracker} />
@@ -228,8 +290,11 @@ export default function ResidentDashboard() {
             {/* Placeholder routes for new features - Mobile First */}
             <Route path="/resident/:id/reports">
               <div className="bg-white p-4 sm:p-6 rounded-lg border">
-                <h2 className="text-lg font-semibold mb-4">Weekly Reports</h2>
-                <p className="text-sm sm:text-base text-gray-600">AI-generated weekly reports will appear here.</p>
+                <WeeklyReportsArchive
+                  residentId={resident.id}
+                  residentName={`${resident.firstName} ${resident.lastInitial}.`}
+                  onGenerate={() => setShowReportEditor(true)}
+                />
               </div>
             </Route>
             
@@ -284,22 +349,6 @@ export default function ResidentDashboard() {
                     </p>
                   </div>
                 )}
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowStatusModal(true)}
-                  >
-                    Manage Status
-                  </Button>
-                  <Button
-                    onClick={() => setShowReportEditor(true)}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    <Wand2 className="w-4 h-4 mr-2" />
-                    Generate Report
-                  </Button>
-                </div>
 
                 <section>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>

@@ -24,7 +24,7 @@ export class OpenAIProvider implements AIProvider {
     // Convert data to Entry format for semantic classification
     const entries: Entry[] = [];
     const checklist = data.data.checklist;
-    const checklistTimestamp = checklist?.lastUpdated || checklist?.updated || new Date().toISOString();
+    const checklistTimestamp = this.getRecordTimestamp(checklist) || new Date().toISOString();
     
     // Add goals
     data.data.goals.forEach(goal => {
@@ -32,7 +32,7 @@ export class OpenAIProvider implements AIProvider {
         id: goal.id,
         type: 'goal',
         text: `${goal.title}: ${goal.description || ''}`.trim(),
-        createdAt: goal.created || new Date().toISOString(),
+        createdAt: this.getRecordTimestamp(goal) || new Date().toISOString(),
         tags: [goal.status, goal.priority].filter(Boolean)
       });
     });
@@ -43,7 +43,7 @@ export class OpenAIProvider implements AIProvider {
         id: chore.id,
         type: 'chore',
         text: `${chore.choreName}: ${chore.notes || ''}`.trim(),
-        createdAt: chore.created || new Date().toISOString(),
+        createdAt: this.getRecordTimestamp(chore) || new Date().toISOString(),
         tags: [chore.status].filter(Boolean)
       });
     });
@@ -54,7 +54,7 @@ export class OpenAIProvider implements AIProvider {
         id: meeting.id,
         type: 'meeting',
         text: `${meeting.meetingType}: ${meeting.notes || ''}`.trim(),
-        createdAt: meeting.created || new Date().toISOString(),
+        createdAt: this.getRecordTimestamp(meeting) || new Date().toISOString(),
         tags: [meeting.meetingType].filter(Boolean)
       });
     });
@@ -65,7 +65,7 @@ export class OpenAIProvider implements AIProvider {
         id: incident.id,
         type: 'incident',
         text: `${incident.incidentType} (${incident.severity}): ${incident.description}`,
-        createdAt: incident.created || new Date().toISOString(),
+        createdAt: this.getRecordTimestamp(incident) || new Date().toISOString(),
         tags: [incident.incidentType, incident.severity].filter(Boolean)
       });
     });
@@ -76,7 +76,7 @@ export class OpenAIProvider implements AIProvider {
         id: note.id,
         type: 'note',
         text: note.text,
-        createdAt: note.created || new Date().toISOString(),
+        createdAt: this.getRecordTimestamp(note) || new Date().toISOString(),
         tags: [note.source].filter(Boolean),
         category: note.category // Pass through the user-selected category
       });
@@ -88,7 +88,7 @@ export class OpenAIProvider implements AIProvider {
         id: accomplishment.id,
         type: 'note', // Map to note type for classification
         text: `Accomplishment - ${accomplishment.title}: ${accomplishment.description || ''}`.trim(),
-        createdAt: accomplishment.created || new Date().toISOString(),
+        createdAt: this.getRecordTimestamp(accomplishment) || new Date().toISOString(),
         tags: [accomplishment.category].filter(Boolean)
       });
     });
@@ -181,6 +181,7 @@ export class OpenAIProvider implements AIProvider {
       "Use the exact template headers and order.",
       "Write short paragraphs (1-3 sentences) per section; no bullet lists.",
       "Be factual and use only the data provided. Do not invent details.",
+      "When entries conflict, prefer the most recent timestamp.",
       "If a section has no data, write: No updates this week (use 'No additional observations this week' for House Guide Observations).",
       "Include concerns and follow-ups naturally when present.",
       "Include personal observations in the House Guide Observations section.",
@@ -194,6 +195,17 @@ ${categorizedContext}
 `
       : "";
 
+    const rulesBlockParts: string[] = [];
+    if (data.organization?.defaultRules) {
+      rulesBlockParts.push(`ORGANIZATION RULES:\n${data.organization.defaultRules}`);
+    }
+    if (data.house.rules) {
+      rulesBlockParts.push(`HOUSE RULES:\n${data.house.rules}`);
+    }
+    const rulesBlock = rulesBlockParts.length
+      ? `\n${rulesBlockParts.join("\n\n")}\n`
+      : "";
+
     const userPrompt = `Write the weekly report for ${data.resident.firstName} ${data.resident.lastInitial} for the week of ${data.period.weekStart}.
 
 TEMPLATE TO FOLLOW EXACTLY:
@@ -201,7 +213,7 @@ ${template}
 
 SUGGESTED OVERVIEW (from structured data):
 ${overview}
-${categorizedBlock}RAW DATA:
+${categorizedBlock}${rulesBlock}RAW DATA:
 ${this.formatDataForPrompt(data)}
 
 IMPORTANT:
@@ -239,10 +251,12 @@ IMPORTANT:
   private formatDataForPrompt(data: WeeklyReportData): string {
     const sections = [];
     const checklist = data.data.checklist;
+    const checklistTimestamp = this.getRecordTimestamp(checklist);
 
     // Checklist snapshot
     if (checklist) {
       sections.push('CHECKLIST SNAPSHOT:');
+      if (checklistTimestamp) sections.push(`- Last updated: ${this.formatTimestamp(checklistTimestamp)}`);
       if (checklist.phase) sections.push(`- Phase: ${checklist.phase}`);
       if (checklist.program) sections.push(`- Program: ${checklist.program}`);
       if (checklist.sponsorMentor) sections.push(`- Sponsor/Mentor: ${checklist.sponsorMentor}`);
@@ -257,7 +271,8 @@ IMPORTANT:
     if (data.data.goals.length > 0) {
       sections.push(`GOALS (${data.data.goals.length} total):`);
       data.data.goals.forEach(goal => {
-        sections.push(`- ${goal.title} (${goal.status}) - ${goal.description || 'No description'}`);
+        const meta = this.formatEntryMeta(goal, [{ field: 'targetDate', label: 'Target' }]);
+        sections.push(`- ${goal.title} (${goal.status}) - ${goal.description || 'No description'}${meta}`);
       });
     } else {
       sections.push('GOALS: None recorded this week');
@@ -267,7 +282,8 @@ IMPORTANT:
     if (data.data.accomplishments.length > 0) {
       sections.push(`\nACCOMPLISHMENTS (${data.data.accomplishments.length} total):`);
       data.data.accomplishments.forEach(acc => {
-        sections.push(`- ${acc.title} (${acc.category}) - ${acc.description || 'No description'}`);
+        const meta = this.formatEntryMeta(acc, [{ field: 'dateAchieved', label: 'Achieved' }]);
+        sections.push(`- ${acc.title} (${acc.category}) - ${acc.description || 'No description'}${meta}`);
       });
     } else {
       sections.push('\nACCOMPLISHMENTS: None recorded this week');
@@ -277,7 +293,11 @@ IMPORTANT:
     if (data.data.chores.length > 0) {
       sections.push(`\nCHORES (${data.data.chores.length} total):`);
       data.data.chores.forEach(chore => {
-        sections.push(`- ${chore.choreName} (${chore.status}) - Due: ${chore.dueDate || 'No due date'}`);
+        const meta = this.formatEntryMeta(chore, [
+          { field: 'assignedDate', label: 'Assigned' },
+          { field: 'dueDate', label: 'Due' }
+        ]);
+        sections.push(`- ${chore.choreName} (${chore.status})${meta}`);
       });
     } else {
       sections.push('\nCHORES: None assigned this week');
@@ -287,7 +307,8 @@ IMPORTANT:
     if (data.data.incidents.length > 0) {
       sections.push(`\nINCIDENTS (${data.data.incidents.length} total):`);
       data.data.incidents.forEach(incident => {
-        sections.push(`- ${incident.incidentType} (${incident.severity}) - ${incident.description}`);
+        const meta = this.formatEntryMeta(incident, [{ field: 'dateOccurred', label: 'Date' }]);
+        sections.push(`- ${incident.incidentType} (${incident.severity}) - ${incident.description}${meta}`);
       });
     } else {
       sections.push('\nINCIDENTS: None reported this week');
@@ -297,7 +318,8 @@ IMPORTANT:
     if (data.data.meetings.length > 0) {
       sections.push(`\nMEETINGS (${data.data.meetings.length} total):`);
       data.data.meetings.forEach(meeting => {
-        sections.push(`- ${meeting.meetingType} on ${meeting.dateAttended} - ${meeting.notes || 'No notes'}`);
+        const meta = this.formatEntryMeta(meeting, [{ field: 'dateAttended', label: 'Date' }]);
+        sections.push(`- ${meeting.meetingType} - ${meeting.notes || 'No notes'}${meta}`);
       });
     } else {
       sections.push('\nMEETINGS: None attended this week');
@@ -307,7 +329,11 @@ IMPORTANT:
     if (data.data.programFees.length > 0) {
       sections.push(`\nPROGRAM FEES (${data.data.programFees.length} total):`);
       data.data.programFees.forEach(fee => {
-        sections.push(`- $${fee.amount} ${fee.feeType} (${fee.status}) - Due: ${fee.dueDate}`);
+        const meta = this.formatEntryMeta(fee, [
+          { field: 'dueDate', label: 'Due' },
+          { field: 'paidDate', label: 'Paid' }
+        ]);
+        sections.push(`- $${fee.amount} ${fee.feeType} (${fee.status})${meta}`);
       });
     } else {
       sections.push('\nPROGRAM FEES: None this week');
@@ -320,7 +346,8 @@ IMPORTANT:
         const preview = note.text.length > 100 ? note.text.substring(0, 100) + '...' : note.text;
         const sourceLabel = note.source ? note.source.toUpperCase() : 'MANUAL';
         const categoryLabel = note.category && note.category !== 'general' ? ` (${note.category})` : '';
-        sections.push(`- [${sourceLabel}${categoryLabel}] ${preview}`);
+        const meta = this.formatEntryMeta(note);
+        sections.push(`- [${sourceLabel}${categoryLabel}] ${preview}${meta}`);
       });
     } else {
       sections.push('\nNOTES: None recorded this week');
@@ -331,11 +358,52 @@ IMPORTANT:
       sections.push(`\nGENERAL NOTES (use for House Guide Observations):`);
       observationNotes.slice(0, 5).forEach(note => {
         const preview = note.text.length > 120 ? note.text.substring(0, 120) + '...' : note.text;
-        sections.push(`- ${preview}`);
+        const meta = this.formatEntryMeta(note);
+        sections.push(`- ${preview}${meta}`);
       });
     }
 
+    if (data.data.files && data.data.files.length > 0) {
+      sections.push(`\nDOCUMENTS (${data.data.files.length} total):`);
+      data.data.files.forEach((file: any) => {
+        const meta = this.formatEntryMeta(file);
+        sections.push(`- ${file.type || 'document'} - ${file.filename || 'Unnamed file'}${meta}`);
+      });
+    } else {
+      sections.push('\nDOCUMENTS: None recorded this week');
+    }
+
     return sections.join('\n');
+  }
+
+  private getRecordTimestamp(item?: any): string | undefined {
+    if (!item) return undefined;
+    return item.lastUpdated || item.updated || item.created;
+  }
+
+  private formatTimestamp(raw?: string): string {
+    if (!raw) return 'unknown';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return String(raw);
+    return parsed.toISOString();
+  }
+
+  private formatEntryMeta(item: any, fields: Array<{ field: string; label: string }> = []): string {
+    if (!item) return '';
+    const parts: string[] = [];
+
+    fields.forEach(({ field, label }) => {
+      if (item?.[field]) {
+        parts.push(`${label}: ${item[field]}`);
+      }
+    });
+
+    const recorded = this.getRecordTimestamp(item);
+    if (recorded) {
+      parts.push(`Recorded: ${this.formatTimestamp(recorded)}`);
+    }
+
+    return parts.length > 0 ? ` [${parts.join('; ')}]` : '';
   }
 
   private formatClassificationForPrompt(classification: any): string {
@@ -358,7 +426,8 @@ IMPORTANT:
       }
       lines.push(`${label}:`);
       items.slice(0, 8).forEach((item: any) => {
-        lines.push(`- ${this.truncate(item.text, 160)}`);
+        const dateTag = item.date ? ` (${item.date})` : '';
+        lines.push(`- ${this.truncate(item.text, 160)}${dateTag}`);
       });
     });
 

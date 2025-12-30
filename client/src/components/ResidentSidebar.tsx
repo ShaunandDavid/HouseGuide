@@ -25,6 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CATEGORY_LABEL } from "@shared/categories";
+import type { Category } from "@shared/categories";
 import { 
   getGoalsByResident, 
   getChoresByResident, 
@@ -32,7 +33,8 @@ import {
   getIncidentsByResident, 
   getMeetingsByResident, 
   getFeesByResident,
-  getNotesByResident, 
+  getNotesByResident,
+  getChecklistByResident,
   getFilesByResident, 
   getWeeklyReportsByResident
 } from "@/lib/api";
@@ -44,7 +46,7 @@ type SidebarEntry = {
   title: string;
   subtitle?: string;
   timestamp: string;
-  type: 'goal' | 'chore' | 'accomplishment' | 'incident' | 'meeting' | 'fee' | 'note' | 'file' | 'weekly-report';
+  type: 'goal' | 'chore' | 'accomplishment' | 'incident' | 'meeting' | 'fee' | 'note' | 'file' | 'weekly-report' | 'checklist';
   data: any;
 };
 
@@ -54,7 +56,7 @@ interface SidebarFolder {
   icon: React.ComponentType<any>;
   color?: string;
   queryKey: string;
-  fetchFn?: (residentId: string) => Promise<any[]>;
+  fetchFn?: (residentId: string) => Promise<any>;
   items?: {
     id: string;
     title: string;
@@ -62,7 +64,7 @@ interface SidebarFolder {
     path: string;
     color: string;
     queryKey: string;
-    fetchFn: (residentId: string) => Promise<any[]>;
+    fetchFn: (residentId: string) => Promise<any>;
   }[];
   path?: string;
 }
@@ -91,7 +93,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
     return data.map((item) => {
       let title = '';
       let subtitle = '';
-      let timestamp = item.created || item.updated || new Date().toISOString();
+      let timestamp = item.lastUpdated || item.updated || item.created || new Date().toISOString();
       
       switch (type) {
         case 'goal':
@@ -114,15 +116,28 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
           title = `${item.meetingType || 'meeting'} meeting`;
           subtitle = `Date: ${item.dateAttended || 'TBD'}`;
           break;
+        case 'checklist': {
+          title = 'Client Checklist';
+          const summaryParts = [];
+          if (item.sponsorMentor) summaryParts.push(`Sponsor: ${item.sponsorMentor}`);
+          if (item.job) summaryParts.push(`Job: ${item.job}`);
+          if (item.program) summaryParts.push(`Program: ${item.program}`);
+          if (item.homeGroup) summaryParts.push(`Home group: ${item.homeGroup}`);
+          subtitle = summaryParts.length > 0 ? summaryParts.join(' | ') : 'Checklist saved';
+          break;
+        }
         case 'fee':
           title = `${item.feeType || 'fee'} - $${item.amount || '0'}`;
           subtitle = `Status: ${item.status || 'pending'}`;
           break;
         case 'note':
           title = item.text?.substring(0, 30) + (item.text?.length > 30 ? '...' : '') || 'Untitled Note';
-          subtitle = item.category && item.category !== 'general'
-            ? `Category: ${CATEGORY_LABEL[item.category]} | Source: ${item.source || 'manual'}`
-            : `Source: ${item.source || 'manual'}`;
+          if (item.category && item.category !== 'general') {
+            const cat = item.category as Category;
+            subtitle = `Category: ${CATEGORY_LABEL[cat]} | Source: ${item.source || 'manual'}`;
+          } else {
+            subtitle = `Source: ${item.source || 'manual'}`;
+          }
           break;
         case 'file':
           title = item.filename || 'Untitled File';
@@ -197,7 +212,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
           path: `/resident/${id}/checklist`,
           color: 'green',
           queryKey: 'checklist',
-          fetchFn: () => Promise.resolve([]) // Checklist is singular, handled differently
+          fetchFn: (residentId: string) => getChecklistByResident(residentId) // Checklist is singular
         },
         {
           id: 'chores',
@@ -270,6 +285,11 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
       queryFn: () => getGoalsByResident(id || ''),
       enabled: !!id
     }),
+    checklist: useQuery({
+      queryKey: ['checklist', id],
+      queryFn: () => getChecklistByResident(id || ''),
+      enabled: !!id
+    }),
     chores: useQuery({
       queryKey: ['chores', id],
       queryFn: () => getChoresByResident(id || ''),
@@ -300,15 +320,22 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
   // Get entry count for a folder
   const getEntryCount = (queryKey: string): number => {
     const result = queryResults[queryKey as keyof typeof queryResults];
-    return result?.data?.length || 0;
+    const data = result?.data;
+    if (Array.isArray(data)) return data.length;
+    return data ? 1 : 0;
   };
 
   // Get entries for a folder
+  const normalizeEntries = (data: any): any[] => {
+    if (!data) return [];
+    return Array.isArray(data) ? data : [data];
+  };
+
   const getEntries = (folder: SidebarFolder): SidebarEntry[] => {
     if (folder.queryKey === 'trackers') return []; // Trackers is a parent folder
     
     const result = queryResults[folder.queryKey as keyof typeof queryResults];
-    const data = result?.data || [];
+    const data = normalizeEntries(result?.data);
     
     let entryType: SidebarEntry['type'];
     switch (folder.queryKey) {
@@ -324,7 +351,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
   // Get entries for tracker items
   const getTrackerEntries = (item: { queryKey: string }): SidebarEntry[] => {
     const result = queryResults[item.queryKey as keyof typeof queryResults];
-    const data = result?.data || [];
+    const data = normalizeEntries(result?.data);
     return formatEntries(data, item.queryKey as SidebarEntry['type']);
   };
 
@@ -636,10 +663,38 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
             )}
             
             <div className="text-sm text-gray-500 mb-4">
-              Created: {formatTimestamp(entryDetail.entry.timestamp)}
+              {entryDetail.entry.type === 'checklist' ? 'Last updated' : 'Created'}: {formatTimestamp(entryDetail.entry.timestamp)}
             </div>
             
             <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+              {entryDetail.entry.type === 'checklist' && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Checklist Details:</h4>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    {entryDetail.entry.data.phase && (
+                      <div>Phase: {entryDetail.entry.data.phase}</div>
+                    )}
+                    {entryDetail.entry.data.homeGroup && (
+                      <div>Home group: {entryDetail.entry.data.homeGroup}</div>
+                    )}
+                    {entryDetail.entry.data.sponsorMentor && (
+                      <div>Sponsor/Mentor: {entryDetail.entry.data.sponsorMentor}</div>
+                    )}
+                    {entryDetail.entry.data.stepWork && (
+                      <div>Step work: {entryDetail.entry.data.stepWork}</div>
+                    )}
+                    {entryDetail.entry.data.program && (
+                      <div>Program: {entryDetail.entry.data.program}</div>
+                    )}
+                    {entryDetail.entry.data.professionalHelp && (
+                      <div>Professional help: {entryDetail.entry.data.professionalHelp}</div>
+                    )}
+                    {entryDetail.entry.data.job && (
+                      <div>Employment: {entryDetail.entry.data.job}</div>
+                    )}
+                  </div>
+                </div>
+              )}
               {entryDetail.entry.data.text && (
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Note Content:</h4>
@@ -666,7 +721,7 @@ export default function ResidentSidebar({ isCollapsed, onToggle }: ResidentSideb
                 <div>
                   <h4 className="font-medium text-gray-900 mb-1">Category:</h4>
                   <span className="inline-flex px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                    {CATEGORY_LABEL[entryDetail.entry.data.category] || entryDetail.entry.data.category}
+                    {CATEGORY_LABEL[entryDetail.entry.data.category as Category] || entryDetail.entry.data.category}
                   </span>
                 </div>
               )}

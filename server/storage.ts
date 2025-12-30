@@ -1,18 +1,29 @@
 import type { 
-  Guide, House, Resident, FileRecord, Note, Report, WeeklyReport,
+  Organization, Guide, House, Resident, FileRecord, Note, Report, WeeklyReport,
   Goal, Checklist, Chore, Accomplishment, Incident, Meeting, ProgramFee,
-  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport, InsertWeeklyReport,
-  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee
+  ChatThread, ChatMessage, ChatAttachment,
+  InsertOrganization, InsertGuide, InsertOrgUser, InsertHouse, InsertResident, InsertFile, InsertNote, UpdateNote, InsertReport, InsertWeeklyReport,
+  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee,
+  InsertChatThread, InsertChatMessage, InsertChatAttachment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // Organizations
+  getOrganization(id: string): Promise<Organization | undefined>;
+  getOrganizationByName(name: string): Promise<Organization | undefined>;
+  createOrganization(org: InsertOrganization): Promise<Organization>;
+  updateOrganization(id: string, updates: Partial<InsertOrganization>): Promise<Organization>;
+  getOrganizations(): Promise<Organization[]>;
+
   // Guides
   getGuide(id: string): Promise<Guide | undefined>;
   getGuideByEmail(email: string): Promise<Guide | undefined>;
   getGuideByVerificationToken(token: string): Promise<Guide | undefined>;
   createGuide(guide: InsertGuide): Promise<Guide>;
+  createOrgUser(user: InsertOrgUser): Promise<Guide>;
   updateGuide(id: string, updates: Partial<Guide>): Promise<Guide>;
+  getGuidesByOrg(orgId: string): Promise<Guide[]>;
   
   // Houses
   getHouse(id: string): Promise<House | undefined>;
@@ -20,6 +31,7 @@ export interface IStorage {
   createHouse(house: InsertHouse): Promise<House>;
   updateHouse(id: string, updates: Partial<InsertHouse>): Promise<House>;
   getAllHouses(): Promise<House[]>;
+  getHousesByOrg(orgId: string): Promise<House[]>;
   
   // Residents
   getResident(id: string): Promise<Resident | undefined>;
@@ -92,6 +104,7 @@ export interface IStorage {
   getNote(id: string): Promise<Note | undefined>;
   getNotesByResident(residentId: string): Promise<Note[]>;
   createNote(note: InsertNote): Promise<Note>;
+  updateNote(id: string, updates: UpdateNote): Promise<Note>;
   
   // Weekly Reports (AI Generated)
   getWeeklyReport(id: string): Promise<WeeklyReport | undefined>;
@@ -99,9 +112,20 @@ export interface IStorage {
   createWeeklyReport(report: InsertWeeklyReport): Promise<WeeklyReport>;
   updateWeeklyReport(id: string, updates: Partial<InsertWeeklyReport>): Promise<WeeklyReport>;
   deleteWeeklyReport(id: string): Promise<void>;
+
+  // Chat
+  getChatThread(id: string): Promise<ChatThread | undefined>;
+  getChatThreadsByOrg(orgId: string): Promise<ChatThread[]>;
+  getChatThreadByHouse(orgId: string, houseId: string): Promise<ChatThread | undefined>;
+  createChatThread(thread: InsertChatThread): Promise<ChatThread>;
+  getChatMessagesByThread(threadId: string, limit?: number, offset?: number): Promise<ChatMessage[]>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  createChatAttachment(attachment: InsertChatAttachment): Promise<ChatAttachment>;
+  getChatAttachmentsByMessage(messageId: string): Promise<ChatAttachment[]>;
 }
 
 export class MemStorage implements IStorage {
+  private organizations: Map<string, Organization> = new Map();
   private guides: Map<string, Guide> = new Map();
   private houses: Map<string, House> = new Map();
   private residents: Map<string, Resident> = new Map();
@@ -116,16 +140,49 @@ export class MemStorage implements IStorage {
   private programFees: Map<string, ProgramFee> = new Map();
   private notes: Map<string, Note> = new Map();
   private weeklyReports: Map<string, WeeklyReport> = new Map();
+  private chatThreads: Map<string, ChatThread> = new Map();
+  private chatMessages: Map<string, ChatMessage> = new Map();
+  private chatAttachments: Map<string, ChatAttachment> = new Map();
 
   constructor() {
-    // Initialize with default house
-    const defaultHouse: House = {
-      id: "house-main",
+    // Initialize with default organization and house
+    const defaultOrg: Organization = {
+      id: "org-main",
       name: "MAIN",
       created: new Date().toISOString(),
       updated: new Date().toISOString()
     };
+    this.organizations.set(defaultOrg.id, defaultOrg);
+
+    const defaultHouse: House = {
+      id: "house-main",
+      name: "MAIN",
+      orgId: defaultOrg.id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
     this.houses.set("house-main", defaultHouse);
+
+    const familyThread: ChatThread = {
+      id: "thread-family-main",
+      orgId: defaultOrg.id,
+      type: "family",
+      name: "Family Chat",
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.chatThreads.set(familyThread.id, familyThread);
+
+    const houseThread: ChatThread = {
+      id: "thread-house-main",
+      orgId: defaultOrg.id,
+      houseId: defaultHouse.id,
+      type: "house",
+      name: "MAIN House Thread",
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.chatThreads.set(houseThread.id, houseThread);
     
     // Initialize with sample resident
     const sampleResident: Resident = {
@@ -138,6 +195,44 @@ export class MemStorage implements IStorage {
       updated: new Date().toISOString()
     };
     this.residents.set("resident-1", sampleResident);
+  }
+
+  // Organization methods
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    return this.organizations.get(id);
+  }
+
+  async getOrganizationByName(name: string): Promise<Organization | undefined> {
+    return Array.from(this.organizations.values()).find(org => org.name === name);
+  }
+
+  async createOrganization(insertOrg: InsertOrganization): Promise<Organization> {
+    const id = randomUUID();
+    const org: Organization = {
+      ...insertOrg,
+      id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.organizations.set(id, org);
+    return org;
+  }
+
+  async updateOrganization(id: string, updates: Partial<InsertOrganization>): Promise<Organization> {
+    const existing = this.organizations.get(id);
+    if (!existing) throw new Error('Organization not found');
+
+    const updated: Organization = {
+      ...existing,
+      ...updates,
+      updated: new Date().toISOString()
+    };
+    this.organizations.set(id, updated);
+    return updated;
+  }
+
+  async getOrganizations(): Promise<Organization[]> {
+    return Array.from(this.organizations.values());
   }
 
   // Guide methods
@@ -169,14 +264,19 @@ export class MemStorage implements IStorage {
   async createGuide(insertGuide: InsertGuide): Promise<Guide> {
     const id = randomUUID();
     const verificationToken = randomUUID();
-    
-    // Create the house first
-    const house = await this.createHouse({ name: insertGuide.houseName });
+
+    const org = await this.createOrganization({ name: insertGuide.organizationName });
+    const house = await this.createHouse({ name: insertGuide.houseName, orgId: org.id });
     
     const guide: Guide = { 
-      ...insertGuide,
       id,
+      email: insertGuide.email.toLowerCase(),
+      name: insertGuide.name,
+      password: insertGuide.password,
+      houseName: insertGuide.houseName,
       houseId: house.id,
+      orgId: org.id,
+      role: "owner",
       isEmailVerified: false,
       verificationToken,
       created: new Date().toISOString(), 
@@ -184,6 +284,41 @@ export class MemStorage implements IStorage {
     };
     this.guides.set(id, guide);
     return guide;
+  }
+
+  async createOrgUser(insertUser: InsertOrgUser): Promise<Guide> {
+    const id = randomUUID();
+    const verificationToken = randomUUID();
+    let houseId = insertUser.houseId;
+    let houseName = insertUser.houseName;
+
+    if (!houseId && insertUser.houseName) {
+      const house = await this.createHouse({ name: insertUser.houseName, orgId: insertUser.orgId });
+      houseId = house.id;
+      houseName = house.name;
+    }
+
+    const guide: Guide = {
+      id,
+      email: insertUser.email.toLowerCase(),
+      name: insertUser.name,
+      password: insertUser.password,
+      houseName: houseName || "Unassigned",
+      houseId,
+      orgId: insertUser.orgId,
+      role: insertUser.role,
+      isEmailVerified: false,
+      verificationToken,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    };
+
+    this.guides.set(id, guide);
+    return guide;
+  }
+
+  async getGuidesByOrg(orgId: string): Promise<Guide[]> {
+    return Array.from(this.guides.values()).filter(guide => guide.orgId === orgId);
   }
 
   // House methods
@@ -207,8 +342,28 @@ export class MemStorage implements IStorage {
     return house;
   }
 
+  async updateHouse(id: string, updates: Partial<InsertHouse>): Promise<House> {
+    const existing = this.houses.get(id);
+    if (!existing) {
+      throw new Error('House not found');
+    }
+
+    const updated: House = {
+      ...existing,
+      ...updates,
+      updated: new Date().toISOString()
+    };
+
+    this.houses.set(id, updated);
+    return updated;
+  }
+
   async getAllHouses(): Promise<House[]> {
     return Array.from(this.houses.values());
+  }
+
+  async getHousesByOrg(orgId: string): Promise<House[]> {
+    return Array.from(this.houses.values()).filter(house => house.orgId === orgId);
   }
 
   // Resident methods
@@ -601,6 +756,22 @@ export class MemStorage implements IStorage {
     return note;
   }
 
+  async updateNote(id: string, updates: UpdateNote): Promise<Note> {
+    const existing = this.notes.get(id);
+    if (!existing) {
+      throw new Error("Note not found");
+    }
+
+    const updated: Note = {
+      ...existing,
+      ...updates,
+      updated: new Date().toISOString(),
+    };
+
+    this.notes.set(id, updated);
+    return updated;
+  }
+
   // Weekly Reports (AI Generated) - MemStorage implementation
   async getWeeklyReport(id: string): Promise<WeeklyReport | undefined> {
     return this.weeklyReports.get(id);
@@ -648,6 +819,68 @@ export class MemStorage implements IStorage {
 
   async deleteWeeklyReport(id: string): Promise<void> {
     this.weeklyReports.delete(id);
+  }
+
+  // Chat methods
+  async getChatThread(id: string): Promise<ChatThread | undefined> {
+    return this.chatThreads.get(id);
+  }
+
+  async getChatThreadsByOrg(orgId: string): Promise<ChatThread[]> {
+    return Array.from(this.chatThreads.values()).filter(thread => thread.orgId === orgId);
+  }
+
+  async getChatThreadByHouse(orgId: string, houseId: string): Promise<ChatThread | undefined> {
+    return Array.from(this.chatThreads.values()).find(
+      thread => thread.orgId === orgId && thread.houseId === houseId && thread.type === "house"
+    );
+  }
+
+  async createChatThread(thread: InsertChatThread): Promise<ChatThread> {
+    const id = randomUUID();
+    const record: ChatThread = {
+      ...thread,
+      id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.chatThreads.set(id, record);
+    return record;
+  }
+
+  async getChatMessagesByThread(threadId: string, limit = 100, offset = 0): Promise<ChatMessage[]> {
+    return Array.from(this.chatMessages.values())
+      .filter(message => message.threadId === threadId)
+      .slice(offset, offset + limit)
+      .sort((a, b) => a.created.localeCompare(b.created));
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const id = randomUUID();
+    const record: ChatMessage = {
+      ...message,
+      id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.chatMessages.set(id, record);
+    return record;
+  }
+
+  async createChatAttachment(attachment: InsertChatAttachment): Promise<ChatAttachment> {
+    const id = randomUUID();
+    const record: ChatAttachment = {
+      ...attachment,
+      id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    this.chatAttachments.set(id, record);
+    return record;
+  }
+
+  async getChatAttachmentsByMessage(messageId: string): Promise<ChatAttachment[]> {
+    return Array.from(this.chatAttachments.values()).filter(att => att.messageId === messageId);
   }
 }
 

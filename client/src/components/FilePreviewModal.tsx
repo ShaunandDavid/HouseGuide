@@ -10,8 +10,15 @@ interface FilePreviewModalProps {
 }
 
 const getFileUrl = (file: FileRecord) => {
-  if (!file.url) return "";
-  return file.url;
+  const rawUrl = file.url || "";
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+    return rawUrl;
+  }
+  if (rawUrl.startsWith("/")) {
+    return rawUrl;
+  }
+  return `/${rawUrl}`;
 };
 
 const isImageFile = (file: FileRecord) => file.mimeType?.startsWith("image/");

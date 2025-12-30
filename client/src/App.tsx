@@ -3,13 +3,13 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PinLock } from "@/components/PinLock";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import VerifyEmail from "@/pages/VerifyEmail";
 import OnboardResident from "@/pages/OnboardResident";
 import House from "@/pages/House";
 import ResidentDashboard from "@/pages/ResidentDashboard";
-import TrackerDashboard from "@/pages/TrackerDashboard";
 import GoalTracker from "@/pages/GoalTracker";
 import ChecklistTracker from "@/pages/ChecklistTracker";
 import ChoreTracker from "@/pages/ChoreTracker";
@@ -20,6 +20,7 @@ import ProgramFeesTracker from "@/pages/ProgramFeesTracker";
 import AdminDrillDashboard from "@/pages/AdminDrillDashboard";
 import HeroLanding from "@/pages/HeroLanding";
 import NotFound from "@/pages/not-found";
+import Chat from "@/pages/Chat";
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
@@ -58,7 +59,7 @@ function Router() {
       <Route path="/dashboard" component={House} />
       <Route path="/dashboard/onboard" component={OnboardResident} />
       <Route path="/resident/:id" component={ResidentDashboard} />
-      <Route path="/resident/:id/trackers" component={TrackerDashboard} />
+      <Route path="/resident/:id/trackers" component={ResidentDashboard} />
       {/* Sidebar-based dashboard routes */}
       <Route path="/resident/:id/dashboard" component={ResidentDashboard} />
       <Route path="/resident/:id/goals" component={ResidentDashboard} />
@@ -72,6 +73,7 @@ function Router() {
       <Route path="/resident/:id/pictures" component={ResidentDashboard} />
       <Route path="/resident/:id/notes" component={ResidentDashboard} />
       <Route path="/admin/drill" component={AdminDrillDashboard} />
+      <Route path="/chat" component={Chat} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -82,6 +84,7 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <Toaster />
+        <PinLock />
         <Router />
       </QueryClientProvider>
     </ErrorBoundary>

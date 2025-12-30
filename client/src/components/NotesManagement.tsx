@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PlusIcon, FileTextIcon, ScanTextIcon, CalendarIcon } from "lucide-react";
 import { MicInput } from "@/components/MicInput";
 import { CategoryPills } from "@/components/CategoryPills";
-import { createNote, getNotesByResident } from "@/lib/api";
+import { createNote, getNotesByResident, updateNote } from "@/lib/api";
 import type { Note, InsertNote } from "@shared/schema";
 import type { Category } from "@shared/categories";
 import { CATEGORY_LABEL, CATEGORY_ICON } from "@shared/categories";
@@ -21,15 +21,15 @@ interface NotesManagementProps {
   onNoteCreated?: () => void;
 }
 
-interface NoteFormData {
-  text: string;
-}
-
 export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesManagementProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [editingCategory, setEditingCategory] = useState<Category | undefined>(undefined);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -61,6 +61,29 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
     },
   });
 
+  const updateNoteMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { text: string; category: Category } }) =>
+      updateNote(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notes", residentId] });
+      setEditingNoteId(null);
+      setEditingText("");
+      setEditingCategory(undefined);
+      toast({
+        title: "Note Updated",
+        description: "Your note has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update note. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Update note error:", error);
+    },
+  });
+
   const handleCreateNote = async () => {
     if (!newNoteText.trim()) return;
 
@@ -81,6 +104,30 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
     setNewNoteText("");
     setSelectedCategory(undefined);
     setIsCreating(false);
+  };
+
+  const handleStartEdit = (note: Note) => {
+    setEditingNoteId(note.id);
+    setEditingText(note.text);
+    setEditingCategory(note.category && note.category !== "general" ? note.category : undefined);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditingText("");
+    setEditingCategory(undefined);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingNoteId || !editingText.trim()) return;
+
+    updateNoteMutation.mutate({
+      id: editingNoteId,
+      updates: {
+        text: editingText.trim(),
+        category: editingCategory ?? "general",
+      },
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -217,8 +264,8 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
             <Card key={note.id} data-testid={`note-card-${note.id}`}>
               <CardContent className="p-4">
                 {/* Note Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-start justify-between mb-3 gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     {note.source === "manual" ? (
                       <FileTextIcon className="h-4 w-4 text-blue-600" />
                     ) : (
@@ -231,33 +278,106 @@ export function NotesManagement({ residentId, houseId, onNoteCreated }: NotesMan
                     >
                       {note.source === "manual" ? "Manual Note" : "OCR Extracted"}
                     </Badge>
-                    {note.category && note.category !== "general" && (
-                      <Badge variant="secondary" className="text-xs">
-                        {CATEGORY_ICON[note.category]} {CATEGORY_LABEL[note.category]}
-                      </Badge>
-                    )}
+                    <Badge variant="secondary" className="text-xs">
+                      {CATEGORY_ICON[note.category || "general"]} {CATEGORY_LABEL[note.category || "general"]}
+                    </Badge>
                     {note.linkedFileId && (
                       <Badge variant="outline" className="text-xs">
                         Linked to Image
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-500">
-                    <CalendarIcon className="h-3 w-3" />
-                    <span data-testid={`text-date-${note.id}`}>
-                      {formatDate(note.created)}
-                    </span>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3" />
+                      <span data-testid={`text-date-${note.id}`}>
+                        {formatDate(note.created)}
+                      </span>
+                    </div>
+                    {editingNoteId !== note.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStartEdit(note)}
+                      >
+                        Edit
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 {/* Note Content */}
                 <div className="space-y-3">
-                  <div 
-                    className="text-gray-700 whitespace-pre-wrap break-words"
-                    data-testid={`text-content-${note.id}`}
-                  >
-                    {note.text}
-                  </div>
+                  {editingNoteId === note.id ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={editingCategory ? "outline" : "default"}
+                          onClick={() => setEditingCategory(undefined)}
+                        >
+                          General
+                        </Button>
+                        <CategoryPills value={editingCategory} onChange={setEditingCategory} />
+                      </div>
+                      <div className="relative">
+                        <Textarea
+                          ref={editTextareaRef}
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          rows={4}
+                          className="pr-12"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <MicInput
+                            targetRef={editTextareaRef}
+                            onInsertText={(text, cursorPosition) => {
+                              if (editTextareaRef.current) {
+                                const textarea = editTextareaRef.current;
+                                const currentValue = textarea.value;
+                                const insertPosition = cursorPosition ?? textarea.selectionStart ?? currentValue.length;
+                                
+                                const newValue = 
+                                  currentValue.slice(0, insertPosition) + 
+                                  (insertPosition > 0 && !currentValue[insertPosition - 1]?.match(/\s/) ? ' ' : '') +
+                                  text + 
+                                  (insertPosition < currentValue.length && !currentValue[insertPosition]?.match(/\s/) ? ' ' : '') +
+                                  currentValue.slice(insertPosition);
+                                
+                                setEditingText(newValue);
+                              }
+                            }}
+                            size="sm"
+                            variant="ghost"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSaveEdit}
+                          disabled={!editingText.trim() || updateNoteMutation.isPending}
+                          size="sm"
+                        >
+                          {updateNoteMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                        <Button
+                          onClick={handleCancelEdit}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      className="text-gray-700 whitespace-pre-wrap break-words"
+                      data-testid={`text-content-${note.id}`}
+                    >
+                      {note.text}
+                    </div>
+                  )}
 
                   {/* OCR Note Info */}
                   {note.source === "ocr" && note.linkedFileId && (

@@ -10,9 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MicInput } from "@/components/MicInput";
-import { ArrowLeft, Plus, Users, Calendar, Clock, MapPin, Camera, Image } from "lucide-react";
-import { getResident, getMeetingsByResident, createMeeting, updateMeeting, deleteMeeting, getCurrentUser, apiRequest } from "@/lib/api";
-import { ObjectUploader } from "@/components/ObjectUploader";
+import { ArrowLeft, Plus, Users, Calendar, Clock, MapPin } from "lucide-react";
+import { getResident, getMeetingsByResident, createMeeting, updateMeeting, deleteMeeting, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Meeting } from "@shared/schema";
 
@@ -34,8 +33,7 @@ export default function MeetingTracker() {
     dateAttended: '',
     duration: '',
     location: '',
-    notes: '',
-    photoUrl: ''
+    notes: ''
   });
 
   useEffect(() => {
@@ -81,8 +79,7 @@ export default function MeetingTracker() {
       dateAttended: '',
       duration: '',
       location: '',
-      notes: '',
-      photoUrl: ''
+      notes: ''
     });
     setEditingMeeting(null);
   };
@@ -98,8 +95,7 @@ export default function MeetingTracker() {
       dateAttended: meeting.dateAttended,
       duration: meeting.duration ? meeting.duration.toString() : '',
       location: meeting.location || '',
-      notes: meeting.notes || '',
-      photoUrl: meeting.photoUrl || ''
+      notes: meeting.notes || ''
     });
     setEditingMeeting(meeting);
     setShowMeetingDialog(true);
@@ -127,8 +123,7 @@ export default function MeetingTracker() {
           dateAttended: formData.dateAttended,
           duration: formData.duration ? parseInt(formData.duration) : undefined,
           location: formData.location || undefined,
-          notes: formData.notes || undefined,
-          photoUrl: formData.photoUrl || undefined
+          notes: formData.notes || undefined
         });
         setMeetings(prev => prev.map(meeting => meeting.id === editingMeeting.id ? updatedMeeting : meeting));
         toast({
@@ -145,8 +140,7 @@ export default function MeetingTracker() {
           dateAttended: formData.dateAttended,
           duration: formData.duration ? parseInt(formData.duration) : undefined,
           location: formData.location || undefined,
-          notes: formData.notes || undefined,
-          photoUrl: formData.photoUrl || undefined
+          notes: formData.notes || undefined
         });
         setMeetings(prev => [...prev, newMeeting]);
         toast({
@@ -181,58 +175,6 @@ export default function MeetingTracker() {
         description: "Failed to delete the meeting. Please try again.",
         variant: "destructive"
       });
-    }
-  };
-
-  // Photo upload functions
-  const handleGetUploadParameters = async () => {
-    try {
-      const response = await apiRequest('/api/objects/upload', {
-        method: 'POST',
-      });
-      return {
-        method: 'PUT' as const,
-        url: response.uploadURL,
-      };
-    } catch (error) {
-      toast({
-        title: "Upload Error",
-        description: "Failed to get upload parameters. Please try again.",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
-
-  const handlePhotoUploadComplete = async (result: any) => {
-    if (result.successful && result.successful[0]) {
-      const uploadedFile = result.successful[0];
-      const photoUrl = uploadedFile.uploadURL;
-      
-      try {
-        // Process the photo URL with backend
-        const response = await apiRequest('/api/meeting-photos', {
-          method: 'PUT',
-          body: JSON.stringify({ photoUrl }),
-        });
-        
-        // Update the form with the processed photo URL
-        setFormData(prev => ({
-          ...prev,
-          photoUrl: response.objectPath
-        }));
-        
-        toast({
-          title: "Photo Uploaded",
-          description: "Meeting photo has been uploaded successfully.",
-        });
-      } catch (error) {
-        toast({
-          title: "Upload Processing Error", 
-          description: "Photo uploaded but failed to process. Please try again.",
-          variant: "destructive"
-        });
-      }
     }
   };
 
@@ -336,29 +278,12 @@ export default function MeetingTracker() {
                       <Badge className={`${getMeetingTypeColor(meeting.meetingType)} text-xs`} data-testid="meeting-type">
                         {meeting.meetingType.replace('_', ' ').toUpperCase()}
                       </Badge>
-                      {meeting.photoUrl && (
-                        <Badge variant="outline" className="flex items-center space-x-1 text-xs">
-                          <Image className="w-3 h-3" />
-                          <span>Photo</span>
-                        </Badge>
-                      )}
                     </div>
                     
                     {meeting.notes && (
                       <p className="text-xs sm:text-sm text-gray-600" data-testid="meeting-notes">
                         {meeting.notes}
                       </p>
-                    )}
-                    
-                    {meeting.photoUrl && (
-                      <div className="">
-                        <img 
-                          src={meeting.photoUrl} 
-                          alt="Meeting attendance verification" 
-                          className="w-24 h-18 sm:w-32 sm:h-24 object-cover rounded-lg border"
-                          data-testid="meeting-photo"
-                        />
-                      </div>
                     )}
                     
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
@@ -500,52 +425,6 @@ export default function MeetingTracker() {
                     variant="ghost"
                   />
                 </div>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="text-sm font-medium">Meeting Attendance Photo (Optional)</Label>
-              <div className="space-y-3">
-                {formData.photoUrl ? (
-                  <div className="space-y-2">
-                    <div className="relative border rounded-lg p-3 bg-green-50">
-                      <div className="flex items-center space-x-2">
-                        <Image className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-green-700 font-medium">Photo uploaded successfully</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}
-                        className="absolute top-2 right-2 text-green-600 hover:text-green-800 p-1 touch-manipulation"
-                        data-testid="remove-photo"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <img 
-                      src={formData.photoUrl} 
-                      alt="Meeting attendance verification" 
-                      className="w-full max-w-xs rounded-lg border"
-                      data-testid="uploaded-photo-preview"
-                    />
-                  </div>
-                ) : (
-                  <ObjectUploader
-                    maxNumberOfFiles={1}
-                    maxFileSize={10485760} // 10MB
-                    onGetUploadParameters={handleGetUploadParameters}
-                    onComplete={handlePhotoUploadComplete}
-                    buttonClassName="w-full h-11 sm:h-10 touch-manipulation"
-                  >
-                    <div className="flex items-center justify-center space-x-2">
-                      <Camera className="w-4 h-4" />
-                      <span className="text-sm sm:text-base">Upload Meeting Photo</span>
-                    </div>
-                  </ObjectUploader>
-                )}
-                <p className="text-xs text-gray-500">
-                  Upload a photo to verify meeting attendance (e.g., selfie at meeting location, meeting materials, etc.)
-                </p>
               </div>
             </div>
           </div>

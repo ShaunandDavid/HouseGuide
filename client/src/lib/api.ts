@@ -1,6 +1,7 @@
 import type {
   Guide, House, Resident, FileRecord, Report, Goal, Checklist, Chore, 
   Accomplishment, Incident, Meeting, ProgramFee, Note, WeeklyReport,
+  ChatThread, ChatMessage, ChatAttachment, Organization,
   InsertGuide, InsertHouse, InsertResident, InsertFile, InsertReport,
   InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment,
   InsertIncident, InsertMeeting, InsertProgramFee, InsertNote, InsertWeeklyReport
@@ -43,10 +44,10 @@ export async function login(email: string, password: string) {
   });
 }
 
-export async function register(email: string, password: string, name: string, houseName: string) {
+export async function register(email: string, password: string, name: string, organizationName: string, houseName: string) {
   return apiRequest("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password, name, houseName }),
+    body: JSON.stringify({ email, password, name, organizationName, houseName }),
   });
 }
 
@@ -71,6 +72,103 @@ export function setCurrentUser(user: Guide) {
 
 export function clearCurrentUser() {
   localStorage.removeItem('current-user');
+}
+
+export async function getPinStatus() {
+  return apiRequest('/auth/pin/status');
+}
+
+export async function setPin(pin: string) {
+  return apiRequest('/auth/pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function verifyPin(pin: string) {
+  return apiRequest('/auth/pin/verify', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function getCurrentOrganization(): Promise<{ org: Organization; houses: House[]; role?: string }> {
+  return apiRequest('/orgs/current');
+}
+
+export async function createHouse(data: InsertHouse): Promise<House> {
+  return apiRequest('/orgs/houses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getResidentsForChat(): Promise<Array<Resident & { houseName?: string }>> {
+  return apiRequest('/residents/for-chat');
+}
+
+// Chat
+export async function getChatThreads(): Promise<ChatThread[]> {
+  return apiRequest('/chat/threads');
+}
+
+export async function getChatMessages(threadId: string, limit = 100, offset = 0): Promise<{ thread: ChatThread; messages: Array<ChatMessage & { attachments?: ChatAttachment[] }> }> {
+  return apiRequest(`/chat/threads/${threadId}/messages?limit=${limit}&offset=${offset}`);
+}
+
+export async function sendChatMessage(threadId: string, body: string, messageType: 'text' | 'report' = 'text', residentId?: string): Promise<ChatMessage> {
+  return apiRequest(`/chat/threads/${threadId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ body, messageType, residentId }),
+  });
+}
+
+export async function sendChatAttachment(threadId: string, file: File, body?: string, messageType: 'text' | 'report' = 'text', residentId?: string): Promise<ChatMessage> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (body) formData.append('body', body);
+  if (messageType) formData.append('messageType', messageType);
+  if (residentId) formData.append('residentId', residentId);
+
+  const response = await fetch(`${API_BASE}/chat/threads/${threadId}/attachments`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function sendChatVoice(threadId: string, audioBlob: Blob, messageType: 'text' | 'report' = 'text', residentId?: string): Promise<ChatMessage> {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'voice-note.webm');
+  formData.append('messageType', messageType);
+  if (residentId) formData.append('residentId', residentId);
+
+  const response = await fetch(`${API_BASE}/chat/threads/${threadId}/voice`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function generateChatReport(threadId: string, residentId: string, startDate: string, endDate: string): Promise<{ reportText: string; count: number }> {
+  return apiRequest('/chat/reports/generate', {
+    method: 'POST',
+    body: JSON.stringify({ threadId, residentId, startDate, endDate }),
+  });
 }
 
 // Houses
@@ -327,8 +425,33 @@ export async function createNote(data: InsertNote): Promise<Note> {
   });
 }
 
+export async function updateNote(id: string, data: Partial<Pick<InsertNote, "text" | "category">>): Promise<Note> {
+  return apiRequest(`/notes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function transcribeVoiceNote(formData: FormData): Promise<any> {
   const response = await fetch(`${API_BASE}/notes/voice-note`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function requestOcr(file: File): Promise<{ text: string; confidence: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE}/ocr`, {
     method: 'POST',
     body: formData,
     credentials: 'include',

@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { getCurrentUser, logout, clearCurrentUser } from "@/lib/api";
+import { getCurrentUser, logout, clearCurrentUser, getPinStatus, setPin, apiRequest } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText, X } from "lucide-react";
+import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText, X, MessageSquare } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { ComprehensiveReportModal } from "@/components/ComprehensiveReportModal";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { House, Resident, FileRecord } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 
 interface ResidentWithCounts extends Resident {
   commitmentCount: number;
@@ -34,6 +34,11 @@ export default function House() {
   const [showSettings, setShowSettings] = useState(false);
   const [showRenameFacility, setShowRenameFacility] = useState(false);
   const [newFacilityName, setNewFacilityName] = useState('');
+  const [facilityRules, setFacilityRules] = useState('');
+  const [isSavingRules, setIsSavingRules] = useState(false);
+  const [pinValue, setPinValue] = useState('');
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [isSavingPin, setIsSavingPin] = useState(false);
   const { toast } = useToast();
 
   const { isLoading, error } = useQuery({
@@ -56,7 +61,15 @@ export default function House() {
         controller.abort();
       };
     }
+    setIsLoadingPage(false);
   }, [houseId]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    getPinStatus()
+      .then((data) => setPinEnabled(!!data?.enabled))
+      .catch(() => setPinEnabled(false));
+  }, [currentUser]);
 
   useEffect(() => {
     // Filter residents based on status filter
@@ -87,6 +100,7 @@ export default function House() {
       // Load house data - houseId is actually the house ID from the URL
       const houseData = await getHouseByName(houseId);
       setHouse(houseData);
+      setFacilityRules(houseData?.rules || '');
 
       // Load residents
       const residentsData = await getResidentsByHouse(houseId);
@@ -133,7 +147,7 @@ export default function House() {
     if (!newFacilityName.trim() || !house?.id) return;
     
     try {
-      await apiRequest(`/api/houses/${house.id}`, {
+      await apiRequest(`/houses/${house.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: newFacilityName.trim() }),
         headers: { 'Content-Type': 'application/json' }
@@ -156,10 +170,75 @@ export default function House() {
     }
   };
 
+  const handleSaveFacilityRules = async () => {
+    if (!house?.id) return;
+
+    setIsSavingRules(true);
+    try {
+      await apiRequest(`/houses/${house.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ rules: facilityRules.trim() }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      setHouse(prev => prev ? { ...prev, rules: facilityRules.trim() } : prev);
+      toast({
+        title: "Facility Rules Saved",
+        description: "Rules and regulations have been saved for AI reference.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save facility rules. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingRules(false);
+    }
+  };
+
+  const handleSavePin = async () => {
+    if (!pinValue.trim()) return;
+    setIsSavingPin(true);
+    try {
+      await setPin(pinValue.trim());
+      setPinEnabled(true);
+      setPinValue('');
+      toast({
+        title: "PIN Set",
+        description: "Your session PIN is now active.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to set PIN. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
   if (isLoadingPage) { // Use the renamed isLoadingPage state
     return (
       <div className="min-h-screen flex items-center justify-center" data-testid="house-loading">
         <Loading size="lg" />
+      </div>
+    );
+  }
+
+  if (!houseId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">No House Assigned</h1>
+            <p className="text-gray-600 mb-4">Contact an admin to assign you to a house, or head to chat.</p>
+            <Button onClick={() => setLocation("/chat")} className="w-full">
+              Open Chat
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -187,6 +266,8 @@ export default function House() {
     );
   }
 
+  const rulesChanged = facilityRules.trim() !== (house?.rules || '').trim();
+
   // This part is now conditionally rendered only if there's no error and not loading page.
   // The previous check for !house is implicitly handled by the error display if the house isn't found.
   // If house is null but no error, it means it's still loading or some other state, but the primary error handling is above.
@@ -207,15 +288,27 @@ export default function House() {
               <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Residential Care Management</p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="flex-shrink-0" 
-            onClick={() => setShowSettings(true)}
-            data-testid="settings-button"
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1"
+              onClick={() => setLocation("/chat")}
+              data-testid="chat-button"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Chat</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex-shrink-0" 
+              onClick={() => setShowSettings(true)}
+              data-testid="settings-button"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -446,9 +539,48 @@ export default function House() {
                 <Label className="text-sm font-medium">Application Version</Label>
                 <p className="text-sm text-gray-600">HouseGuide v1.0.0</p>
               </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Facility Rules & Regulations (AI Reference)</Label>
+                <Textarea
+                  value={facilityRules}
+                  onChange={(e) => setFacilityRules(e.target.value)}
+                  placeholder="List the house rules and regulations here. These are used to guide AI summaries and reports."
+                  rows={6}
+                />
+                <p className="text-xs text-gray-500">
+                  Keep this updated so reports reflect your current rules.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Session PIN</Label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value)}
+                  placeholder={pinEnabled ? "PIN is set (enter new to change)" : "Set a 4-8 digit PIN"}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!pinValue.trim() || isSavingPin}
+                  onClick={handleSavePin}
+                >
+                  {isSavingPin ? "Saving..." : "Save PIN"}
+                </Button>
+                <p className="text-xs text-gray-500">
+                  After 15 minutes of inactivity, HouseGuide will lock and require this PIN.
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>
+            <Button
+              onClick={handleSaveFacilityRules}
+              disabled={!rulesChanged || isSavingRules}
+            >
+              {isSavingRules ? "Saving..." : "Save Rules"}
+            </Button>
             <Button
               variant="outline"
               onClick={handleLogout}

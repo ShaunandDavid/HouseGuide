@@ -177,6 +177,7 @@ export class DatabaseBackup {
       `;
 
     await sendEmail({
+      from: process.env.SENDGRID_FROM_EMAIL || "noreply@houseguide.app",
       to: process.env.BACKUP_NOTIFICATION_EMAIL,
       subject,
       html

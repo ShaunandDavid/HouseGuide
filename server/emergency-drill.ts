@@ -239,19 +239,20 @@ export class EmergencyDrill {
       // Step 1: Verify current database state
       const detectionStart = Date.now();
       const { storage } = await import('./storage');
+      const anyStorage: any = storage;
       
       // Get current record counts for verification
       const currentState = {
         houses: (await storage.getAllHouses()).length,
-        residents: (await storage.getAllResidents()).length,
-        goals: (await storage.getAllGoals()).length,
-        chores: (await storage.getAllChores()).length,
-        incidents: (await storage.getAllIncidents()).length,
-        meetings: (await storage.getAllMeetings()).length,
-        accomplishments: (await storage.getAllAccomplishments()).length,
-        checklists: (await storage.getAllChecklists()).length,
-        fees: (await storage.getAllFees()).length,
-        notes: (await storage.getAllNotes()).length
+        residents: (typeof anyStorage.getAllResidents === 'function' ? (await anyStorage.getAllResidents()) : []).length,
+        goals: (typeof anyStorage.getAllGoals === 'function' ? (await anyStorage.getAllGoals()) : []).length,
+        chores: (typeof anyStorage.getAllChores === 'function' ? (await anyStorage.getAllChores()) : []).length,
+        incidents: (typeof anyStorage.getAllIncidents === 'function' ? (await anyStorage.getAllIncidents()) : []).length,
+        meetings: (typeof anyStorage.getAllMeetings === 'function' ? (await anyStorage.getAllMeetings()) : []).length,
+        accomplishments: (typeof anyStorage.getAllAccomplishments === 'function' ? (await anyStorage.getAllAccomplishments()) : []).length,
+        checklists: (typeof anyStorage.getAllChecklists === 'function' ? (await anyStorage.getAllChecklists()) : []).length,
+        fees: (typeof anyStorage.getAllFees === 'function' ? (await anyStorage.getAllFees()) : []).length,
+        notes: (typeof anyStorage.getAllNotes === 'function' ? (await anyStorage.getAllNotes()) : []).length
       };
       
       result.detectedIn = Date.now() - detectionStart;
@@ -330,13 +331,14 @@ export class EmergencyDrill {
       const { db } = await import('./db');
       
       // Check residents have valid house references
-      const orphanedResidents = await db.execute(`
+      const orphanedResidents: any = await db.execute(`
         SELECT COUNT(*) as count FROM residents r 
         LEFT JOIN houses h ON r.house_id = h.id 
         WHERE h.id IS NULL
       `);
-      
-      if (orphanedResidents[0]?.count > 0) return false;
+
+      const orphanCount = Number(orphanedResidents?.rows?.[0]?.count ?? orphanedResidents?.[0]?.count ?? 0);
+      if (orphanCount > 0) return false;
       
       return true;
     } catch {
@@ -348,9 +350,10 @@ export class EmergencyDrill {
     try {
       // Check for data corruption or inconsistencies
       const { storage } = await import('./storage');
+      const anyStorage: any = storage;
       
       // Verify all residents have valid dates
-      const residents = await storage.getAllResidents();
+      const residents = typeof anyStorage.getAllResidents === 'function' ? await anyStorage.getAllResidents() : [];
       for (const resident of residents) {
         if (resident.admissionDate && isNaN(Date.parse(resident.admissionDate))) {
           return false;

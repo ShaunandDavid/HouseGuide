@@ -3,7 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Target, CheckSquare, Home, Award, AlertTriangle, Users, DollarSign } from "lucide-react";
 
-export default function TrackerDashboard() {
+interface TrackerDashboardProps {
+  embedded?: boolean;
+}
+
+export default function TrackerDashboard({ embedded = false }: TrackerDashboardProps) {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
 
@@ -84,28 +88,32 @@ export default function TrackerDashboard() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-50" data-testid="tracker-dashboard">
-      {/* Navigation Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleGoBack}
-              data-testid="back-button"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Tracking Dashboard</h2>
-              <p className="text-sm text-gray-600">Resident progress and activity trackers</p>
+    <div
+      className={embedded ? "flex flex-col bg-surface-50" : "min-h-screen flex flex-col bg-surface-50"}
+      data-testid="tracker-dashboard"
+    >
+      {!embedded && (
+        <header className="bg-white shadow-sm border-b">
+          <div className="px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleGoBack}
+                data-testid="back-button"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Tracking Dashboard</h2>
+                <p className="text-sm text-gray-600">Resident progress and activity trackers</p>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="flex-1 p-4">
+      <main className={embedded ? "p-4" : "flex-1 p-4"}>
         <div className="mb-6">
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Available Trackers</h3>
           <p className="text-gray-600">Select a tracker to view and manage resident progress</p>

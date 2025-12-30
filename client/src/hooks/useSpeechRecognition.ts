@@ -10,6 +10,8 @@ interface SpeechRecognitionErrorEvent extends Event {
   message: string;
 }
 
+type SpeechGrammarList = any;
+
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;

@@ -54,6 +54,7 @@ export function QuickNoteModal({ isOpen, onClose, residentId }: QuickNoteModalPr
           severity: 'medium',
           description: text,
           dateOccurred: today,
+          followUpRequired: false,
           createdBy: currentUser.id
         });
         break;

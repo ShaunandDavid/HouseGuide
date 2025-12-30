@@ -3,15 +3,53 @@ import { pgTable, varchar, boolean, timestamp, text, serial, integer } from "dri
 import { sql } from "drizzle-orm";
 import { CATEGORY_VALUES } from "./categories";
 
+export const GUIDE_ROLE_VALUES = ["owner", "admin", "guide"] as const;
+export type GuideRole = (typeof GUIDE_ROLE_VALUES)[number];
+
+export const CHAT_THREAD_TYPE_VALUES = ["family", "house"] as const;
+export type ChatThreadType = (typeof CHAT_THREAD_TYPE_VALUES)[number];
+
+export const CHAT_MESSAGE_TYPE_VALUES = ["text", "report", "system"] as const;
+export type ChatMessageType = (typeof CHAT_MESSAGE_TYPE_VALUES)[number];
+
+// Organization Schema
+export const insertOrganizationSchema = z.object({
+  name: z.string().min(1).max(120),
+  defaultRules: z.string().max(65536).optional(),
+});
+
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+export interface Organization {
+  id: string;
+  name: string;
+  defaultRules?: string;
+  created: string;
+  updated: string;
+}
+
 // Guide (Auth User) Schema
 export const insertGuideSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1).max(120),
+  organizationName: z.string().min(1).max(120),
   houseName: z.string().min(1).max(80),
 });
 
 export type InsertGuide = z.infer<typeof insertGuideSchema>;
+
+export const insertOrgUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().min(1).max(120),
+  orgId: z.string(),
+  role: z.enum(GUIDE_ROLE_VALUES),
+  houseId: z.string().optional(),
+  houseName: z.string().min(1).max(80).optional(),
+});
+
+export type InsertOrgUser = z.infer<typeof insertOrgUserSchema>;
 
 export interface Guide {
   id: string;
@@ -20,6 +58,9 @@ export interface Guide {
   password: string;
   houseName: string;
   houseId?: string;
+  orgId?: string;
+  role?: GuideRole;
+  pinHash?: string;
   isEmailVerified: boolean;
   verificationToken?: string;
   created: string;
@@ -29,6 +70,8 @@ export interface Guide {
 // House Schema
 export const insertHouseSchema = z.object({
   name: z.string().min(1).max(80),
+  rules: z.string().max(65536).optional(),
+  orgId: z.string().optional(),
 });
 
 export type InsertHouse = z.infer<typeof insertHouseSchema>;
@@ -36,6 +79,8 @@ export type InsertHouse = z.infer<typeof insertHouseSchema>;
 export interface House {
   id: string;
   name: string;
+  orgId?: string;
+  rules?: string;
   created: string;
   updated: string;
 }
@@ -106,6 +151,13 @@ export const insertNoteSchema = z.object({
 });
 
 export type InsertNote = z.infer<typeof insertNoteSchema>;
+
+export const updateNoteSchema = insertNoteSchema.pick({
+  text: true,
+  category: true,
+}).partial();
+
+export type UpdateNote = z.infer<typeof updateNoteSchema>;
 
 export interface Note {
   id: string;
@@ -377,7 +429,85 @@ export interface ProgramFee {
   updated: string;
 }
 
+// Chat Thread Schema
+export const insertChatThreadSchema = z.object({
+  orgId: z.string(),
+  houseId: z.string().optional(),
+  type: z.enum(CHAT_THREAD_TYPE_VALUES),
+  name: z.string().min(1).max(120),
+  createdBy: z.string().optional(),
+});
+
+export type InsertChatThread = z.infer<typeof insertChatThreadSchema>;
+
+export interface ChatThread {
+  id: string;
+  orgId: string;
+  houseId?: string;
+  type: ChatThreadType;
+  name: string;
+  createdBy?: string;
+  created: string;
+  updated: string;
+}
+
+// Chat Message Schema
+export const insertChatMessageSchema = z.object({
+  threadId: z.string(),
+  orgId: z.string(),
+  houseId: z.string().optional(),
+  residentId: z.string().optional(),
+  senderId: z.string(),
+  body: z.string().max(65536),
+  messageType: z.enum(CHAT_MESSAGE_TYPE_VALUES).default("text"),
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
+export interface ChatMessage {
+  id: string;
+  threadId: string;
+  orgId: string;
+  houseId?: string;
+  residentId?: string;
+  senderId: string;
+  body: string;
+  messageType: ChatMessageType;
+  created: string;
+  updated: string;
+}
+
+// Chat Attachment Schema
+export const insertChatAttachmentSchema = z.object({
+  messageId: z.string(),
+  url: z.string().min(1).max(2000),
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().max(100),
+  size: z.number().min(0),
+});
+
+export type InsertChatAttachment = z.infer<typeof insertChatAttachmentSchema>;
+
+export interface ChatAttachment {
+  id: string;
+  messageId: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  created: string;
+  updated: string;
+}
+
 // Drizzle Table Definitions
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 120 }).notNull(),
+  defaultRules: text("default_rules"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
 export const guides = pgTable("guides", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -385,6 +515,9 @@ export const guides = pgTable("guides", {
   password: varchar("password", { length: 255 }).notNull(),
   houseName: varchar("house_name", { length: 80 }).notNull(),
   houseId: varchar("house_id"),
+  orgId: varchar("org_id"),
+  role: varchar("role", { length: 20 }).default("owner").notNull(),
+  pinHash: varchar("pin_hash", { length: 255 }),
   isEmailVerified: boolean("is_email_verified").default(false).notNull(),
   verificationToken: varchar("verification_token", { length: 255 }),
   created: timestamp("created").defaultNow().notNull(),
@@ -394,6 +527,8 @@ export const guides = pgTable("guides", {
 export const houses = pgTable("houses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 80 }).notNull(),
+  orgId: varchar("org_id"),
+  rules: text("rules"),
   created: timestamp("created").defaultNow().notNull(),
   updated: timestamp("updated").defaultNow().notNull(),
 });
@@ -550,6 +685,41 @@ export const programFees = pgTable("program_fees", {
   status: varchar("status", { length: 20 }).default("pending").notNull(),
   notes: text("notes"),
   createdBy: varchar("created_by").notNull(),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const chatThreads = pgTable("chat_threads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  houseId: varchar("house_id"),
+  type: varchar("type", { length: 20 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  createdBy: varchar("created_by"),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  houseId: varchar("house_id"),
+  residentId: varchar("resident_id"),
+  senderId: varchar("sender_id").notNull(),
+  body: text("body").notNull(),
+  messageType: varchar("message_type", { length: 20 }).default("text").notNull(),
+  created: timestamp("created").defaultNow().notNull(),
+  updated: timestamp("updated").defaultNow().notNull(),
+});
+
+export const chatAttachments = pgTable("chat_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull(),
+  url: text("url").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  size: integer("size").notNull(),
   created: timestamp("created").defaultNow().notNull(),
   updated: timestamp("updated").defaultNow().notNull(),
 });

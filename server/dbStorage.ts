@@ -1,21 +1,87 @@
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { db } from "./db";
 import { and } from "drizzle-orm";
 import { 
-  guides, houses, residents, files, reports, weeklyReports, goals, 
+  organizations, guides, houses, residents, files, reports, weeklyReports, goals, 
   checklists, chores, accomplishments, incidents, meetings, 
-  programFees, notes 
+  programFees, notes, chatThreads, chatMessages, chatAttachments
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 import type { 
-  Guide, House, Resident, FileRecord, Note, Report, WeeklyReport,
+  Organization, Guide, House, Resident, FileRecord, Note, Report, WeeklyReport,
   Goal, Checklist, Chore, Accomplishment, Incident, Meeting, ProgramFee,
-  InsertGuide, InsertHouse, InsertResident, InsertFile, InsertNote, InsertReport, InsertWeeklyReport,
-  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee
+  ChatThread, ChatMessage, ChatAttachment,
+  InsertOrganization, InsertGuide, InsertOrgUser, InsertHouse, InsertResident, InsertFile, InsertNote, UpdateNote, InsertReport, InsertWeeklyReport,
+  InsertGoal, InsertChecklist, InsertChore, InsertAccomplishment, InsertIncident, InsertMeeting, InsertProgramFee,
+  InsertChatThread, InsertChatMessage, InsertChatAttachment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export class DbStorage implements IStorage {
+  // Organizations
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    const result = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+    if (result.length === 0) return undefined;
+    const org = result[0];
+    return {
+      ...org,
+      created: org.created.toISOString(),
+      updated: org.updated.toISOString(),
+    } as Organization;
+  }
+
+  async getOrganizationByName(name: string): Promise<Organization | undefined> {
+    const result = await db.select().from(organizations).where(eq(organizations.name, name)).limit(1);
+    if (result.length === 0) return undefined;
+    const org = result[0];
+    return {
+      ...org,
+      created: org.created.toISOString(),
+      updated: org.updated.toISOString(),
+    } as Organization;
+  }
+
+  async createOrganization(insertOrg: InsertOrganization): Promise<Organization> {
+    const result = await db.insert(organizations).values({
+      name: insertOrg.name,
+      defaultRules: insertOrg.defaultRules ?? null,
+    }).returning();
+
+    const org = result[0];
+    return {
+      ...org,
+      created: org.created.toISOString(),
+      updated: org.updated.toISOString(),
+    } as Organization;
+  }
+
+  async updateOrganization(id: string, updates: Partial<InsertOrganization>): Promise<Organization> {
+    const result = await db.update(organizations)
+      .set({
+        ...updates,
+        updated: new Date(),
+      })
+      .where(eq(organizations.id, id))
+      .returning();
+
+    if (result.length === 0) throw new Error('Organization not found');
+    const org = result[0];
+    return {
+      ...org,
+      created: org.created.toISOString(),
+      updated: org.updated.toISOString(),
+    } as Organization;
+  }
+
+  async getOrganizations(): Promise<Organization[]> {
+    const result = await db.select().from(organizations);
+    return result.map(org => ({
+      ...org,
+      created: org.created.toISOString(),
+      updated: org.updated.toISOString(),
+    })) as Organization[];
+  }
+
   // Guides
   async getGuide(id: string): Promise<Guide | undefined> {
     const result = await db.select().from(guides).where(eq(guides.id, id)).limit(1);
@@ -52,20 +118,22 @@ export class DbStorage implements IStorage {
 
   async createGuide(insertGuide: InsertGuide): Promise<Guide> {
     const verificationToken = randomUUID();
-    
-    // Create the house first
-    const house = await this.createHouse({ name: insertGuide.houseName });
-    
+
+    const org = await this.createOrganization({ name: insertGuide.organizationName });
+    const house = await this.createHouse({ name: insertGuide.houseName, orgId: org.id });
+
     const result = await db.insert(guides).values({
       email: insertGuide.email.toLowerCase(),
       name: insertGuide.name,
       password: insertGuide.password,
       houseName: insertGuide.houseName,
       houseId: house.id,
+      orgId: org.id,
+      role: "owner",
       isEmailVerified: false,
       verificationToken,
     }).returning();
-    
+
     const guide = result[0];
     return {
       ...guide,
@@ -74,10 +142,42 @@ export class DbStorage implements IStorage {
     } as Guide;
   }
 
-  async updateGuide(id: string, updates: Partial<InsertGuide>): Promise<Guide> {
+  async createOrgUser(insertUser: InsertOrgUser): Promise<Guide> {
+    const verificationToken = randomUUID();
+    let houseId = insertUser.houseId;
+    let houseName = insertUser.houseName;
+
+    if (!houseId && insertUser.houseName) {
+      const house = await this.createHouse({ name: insertUser.houseName, orgId: insertUser.orgId });
+      houseId = house.id;
+      houseName = house.name;
+    }
+
+    const result = await db.insert(guides).values({
+      email: insertUser.email.toLowerCase(),
+      name: insertUser.name,
+      password: insertUser.password,
+      houseName: houseName || "Unassigned",
+      houseId,
+      orgId: insertUser.orgId,
+      role: insertUser.role,
+      isEmailVerified: false,
+      verificationToken,
+    }).returning();
+
+    const guide = result[0];
+    return {
+      ...guide,
+      created: guide.created.toISOString(),
+      updated: guide.updated.toISOString(),
+    } as Guide;
+  }
+
+  async updateGuide(id: string, updates: Partial<Guide>): Promise<Guide> {
+    const { created: _created, updated: _updated, ...safeUpdates } = updates as any;
     const result = await db.update(guides)
       .set({
-        ...updates,
+        ...safeUpdates,
         updated: new Date(),
       })
       .where(eq(guides.id, id))
@@ -90,6 +190,15 @@ export class DbStorage implements IStorage {
       created: guide.created.toISOString(),
       updated: guide.updated.toISOString(),
     } as Guide;
+  }
+
+  async getGuidesByOrg(orgId: string): Promise<Guide[]> {
+    const result = await db.select().from(guides).where(eq(guides.orgId, orgId));
+    return result.map(guide => ({
+      ...guide,
+      created: guide.created.toISOString(),
+      updated: guide.updated.toISOString(),
+    })) as Guide[];
   }
   
   // Houses
@@ -118,6 +227,8 @@ export class DbStorage implements IStorage {
   async createHouse(insertHouse: InsertHouse): Promise<House> {
     const result = await db.insert(houses).values({
       name: insertHouse.name,
+      orgId: insertHouse.orgId ?? null,
+      rules: insertHouse.rules ?? null,
     }).returning();
     
     const house = result[0];
@@ -128,8 +239,35 @@ export class DbStorage implements IStorage {
     } as House;
   }
 
+  async updateHouse(id: string, updates: Partial<InsertHouse>): Promise<House> {
+    const result = await db.update(houses)
+      .set({
+        ...updates,
+        updated: new Date(),
+      })
+      .where(eq(houses.id, id))
+      .returning();
+
+    if (result.length === 0) throw new Error('House not found');
+    const house = result[0];
+    return {
+      ...house,
+      created: house.created.toISOString(),
+      updated: house.updated.toISOString(),
+    } as House;
+  }
+
   async getAllHouses(): Promise<House[]> {
     const result = await db.select().from(houses);
+    return result.map(house => ({
+      ...house,
+      created: house.created.toISOString(),
+      updated: house.updated.toISOString(),
+    })) as House[];
+  }
+
+  async getHousesByOrg(orgId: string): Promise<House[]> {
+    const result = await db.select().from(houses).where(eq(houses.orgId, orgId));
     return result.map(house => ({
       ...house,
       created: house.created.toISOString(),
@@ -710,6 +848,24 @@ export class DbStorage implements IStorage {
     } as Note;
   }
 
+  async updateNote(id: string, updates: UpdateNote): Promise<Note> {
+    const result = await db.update(notes)
+      .set({
+        ...updates,
+        updated: new Date(),
+      })
+      .where(eq(notes.id, id))
+      .returning();
+
+    if (result.length === 0) throw new Error('Note not found');
+    const note = result[0];
+    return {
+      ...note,
+      created: note.created.toISOString(),
+      updated: note.updated.toISOString(),
+    } as Note;
+  }
+
   // Weekly Reports (AI Generated) - DbStorage implementation
   async getWeeklyReport(id: string): Promise<WeeklyReport | undefined> {
     const result = await db.select().from(weeklyReports).where(eq(weeklyReports.id, id)).limit(1);
@@ -767,5 +923,114 @@ export class DbStorage implements IStorage {
 
   async deleteWeeklyReport(id: string): Promise<void> {
     await db.delete(weeklyReports).where(eq(weeklyReports.id, id));
+  }
+
+  // Chat
+  async getChatThread(id: string): Promise<ChatThread | undefined> {
+    const result = await db.select().from(chatThreads).where(eq(chatThreads.id, id)).limit(1);
+    if (result.length === 0) return undefined;
+    const thread = result[0];
+    return {
+      ...thread,
+      created: thread.created.toISOString(),
+      updated: thread.updated.toISOString(),
+    } as ChatThread;
+  }
+
+  async getChatThreadsByOrg(orgId: string): Promise<ChatThread[]> {
+    const result = await db.select().from(chatThreads).where(eq(chatThreads.orgId, orgId));
+    return result.map(thread => ({
+      ...thread,
+      created: thread.created.toISOString(),
+      updated: thread.updated.toISOString(),
+    })) as ChatThread[];
+  }
+
+  async getChatThreadByHouse(orgId: string, houseId: string): Promise<ChatThread | undefined> {
+    const result = await db.select().from(chatThreads)
+      .where(and(eq(chatThreads.orgId, orgId), eq(chatThreads.houseId, houseId)))
+      .limit(1);
+    if (result.length === 0) return undefined;
+    const thread = result[0];
+    return {
+      ...thread,
+      created: thread.created.toISOString(),
+      updated: thread.updated.toISOString(),
+    } as ChatThread;
+  }
+
+  async createChatThread(thread: InsertChatThread): Promise<ChatThread> {
+    const result = await db.insert(chatThreads).values({
+      orgId: thread.orgId,
+      houseId: thread.houseId ?? null,
+      type: thread.type,
+      name: thread.name,
+      createdBy: thread.createdBy ?? null,
+    }).returning();
+
+    const record = result[0];
+    return {
+      ...record,
+      created: record.created.toISOString(),
+      updated: record.updated.toISOString(),
+    } as ChatThread;
+  }
+
+  async getChatMessagesByThread(threadId: string, limit = 100, offset = 0): Promise<ChatMessage[]> {
+    const result = await db.select().from(chatMessages)
+      .where(eq(chatMessages.threadId, threadId))
+      .orderBy(asc(chatMessages.created))
+      .limit(limit)
+      .offset(offset);
+    return result.map(message => ({
+      ...message,
+      created: message.created.toISOString(),
+      updated: message.updated.toISOString(),
+    })) as ChatMessage[];
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const result = await db.insert(chatMessages).values({
+      threadId: message.threadId,
+      orgId: message.orgId,
+      houseId: message.houseId ?? null,
+      residentId: message.residentId ?? null,
+      senderId: message.senderId,
+      body: message.body,
+      messageType: message.messageType,
+    }).returning();
+
+    const record = result[0];
+    return {
+      ...record,
+      created: record.created.toISOString(),
+      updated: record.updated.toISOString(),
+    } as ChatMessage;
+  }
+
+  async createChatAttachment(attachment: InsertChatAttachment): Promise<ChatAttachment> {
+    const result = await db.insert(chatAttachments).values({
+      messageId: attachment.messageId,
+      url: attachment.url,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+    }).returning();
+
+    const record = result[0];
+    return {
+      ...record,
+      created: record.created.toISOString(),
+      updated: record.updated.toISOString(),
+    } as ChatAttachment;
+  }
+
+  async getChatAttachmentsByMessage(messageId: string): Promise<ChatAttachment[]> {
+    const result = await db.select().from(chatAttachments).where(eq(chatAttachments.messageId, messageId));
+    return result.map(att => ({
+      ...att,
+      created: att.created.toISOString(),
+      updated: att.updated.toISOString(),
+    })) as ChatAttachment[];
   }
 }

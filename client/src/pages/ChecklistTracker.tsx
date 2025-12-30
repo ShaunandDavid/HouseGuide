@@ -10,6 +10,7 @@ import { ArrowLeft, Save, CheckSquare, User, Users, Home, Book, ListChecks, Stet
 import { getResident, getChecklistByResident, createOrUpdateChecklist, getCurrentUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Resident, Checklist } from "@shared/schema";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChecklistTracker() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export default function ChecklistTracker() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -126,6 +128,7 @@ export default function ChecklistTracker() {
         lastUpdated: new Date().toISOString()
       });
       setChecklist(savedChecklist);
+      queryClient.invalidateQueries({ queryKey: ['checklist', id] });
       toast({
         title: "Checklist Saved",
         description: "Client checklist has been updated successfully.",
