@@ -10,6 +10,7 @@ interface TrackerDashboardProps {
 export default function TrackerDashboard({ embedded = false }: TrackerDashboardProps) {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const ContentTag = embedded ? "div" : "main";
 
   const handleGoBack = () => {
     setLocation(`/resident/${id}`);
@@ -113,7 +114,7 @@ export default function TrackerDashboard({ embedded = false }: TrackerDashboardP
         </header>
       )}
 
-      <main className={embedded ? "p-4" : "flex-1 p-4"}>
+      <ContentTag className={embedded ? "p-4" : "flex-1 p-4"}>
         <div className="mb-6">
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Available Trackers</h3>
           <p className="text-gray-600">Select a tracker to view and manage resident progress</p>
@@ -144,7 +145,7 @@ export default function TrackerDashboard({ embedded = false }: TrackerDashboardP
             );
           })}
         </div>
-      </main>
+      </ContentTag>
     </div>
   );
 }

@@ -133,7 +133,7 @@ async function classifyWithLLM(entries: Entry[]): Promise<Classification> {
     "1) SponsorMentor, 2) WorkSchool, 3) ChoresCompliance, 4) DemeanorParticipation, 5) ProfessionalHelpAppointments.",
     "Use SEMANTIC meaning, not keywords.",
     "If unsure, leave it out and include its id in uncategorized.",
-    "Summaries must read like professional residential care notes.",
+    "Summaries must read like formal, court-appropriate case management notes.",
     "Keep PHI minimal (respect redactions already present).",
   ].join(" ");
 
@@ -427,12 +427,21 @@ export async function generateWeeklyReport(
   }
   
   // Create final classification from buckets
+  const sourceLabels: Record<ClassifiedItem["sourceType"], string> = {
+    goal: "Goal",
+    chore: "Chore",
+    meeting: "Meeting",
+    incident: "Incident",
+    note: "Note",
+  };
+
   const summarize = (items: typeof buckets.SponsorMentor) => {
     if (!items.length) return "No updates recorded in this category for the period.";
     const count = items.length;
     const typeSet = new Set(items.map((i) => i.sourceType));
-    const types = Array.from(typeSet).join(", ");
-    return `Recorded ${count} item(s) (${types}). Key notes reflect typical activity and compliance for this week.`;
+    const types = Array.from(typeSet).map((type) => sourceLabels[type] || type).join(", ");
+    const typeSuffix = types ? ` (${types})` : "";
+    return `Recorded ${count} item(s)${typeSuffix}. Summary reflects documented activity for this period.`;
   };
 
   let classification: Classification = {
@@ -444,15 +453,22 @@ export async function generateWeeklyReport(
       ProfessionalHelpAppointments: { items: buckets.ProfessionalHelpAppointments, summary: summarize(buckets.ProfessionalHelpAppointments) },
     },
     uncategorized,
-    overallSummary: llmUsed 
-      ? "Report generated with user categories and AI classification assistance."
-      : uncategorized.length > 0 
-        ? "Report generated with user categories and rule-based classification."
-        : "Report generated from user-categorized entries.",
+    overallSummary: "",
   };
 
   // Apply employment corrector to fix any miscategorized work content
   classification = correctEmploymentLeak(classification);
+
+  const totalItems = Object.values(classification.sections).reduce(
+    (sum, section) => sum + section.items.length,
+    0
+  );
+  const baseSummary = totalItems === 0
+    ? "No documented updates for this period."
+    : `Summary reflects ${totalItems} documented item(s) for the reporting period.`;
+  classification.overallSummary = classification.uncategorized.length > 0
+    ? `${baseSummary} ${classification.uncategorized.length} item(s) require review.`
+    : baseSummary;
   
   // Log final distribution
   console.info("[REPORT] Final categorization counts:", {
@@ -478,11 +494,19 @@ export async function generateWeeklyReport(
 
 /** ---------------- Markdown composer ---------------- **/
 
+const entryTypeLabels: Record<ClassifiedItem["sourceType"], string> = {
+  goal: "Goal",
+  chore: "Chore",
+  meeting: "Meeting",
+  incident: "Incident",
+  note: "Note",
+};
+
 function sec(title: string, s: z.infer<typeof SectionBucket>) {
   const bullets =
     s.items.length === 0
       ? "- No updates this week."
-      : s.items.map((i) => `- (${i.sourceType}) ${trimSentence(i.text)} *(conf: ${i.confidence.toFixed(2)})*`).join("\n");
+      : s.items.map((i) => `- ${entryTypeLabels[i.sourceType] || i.sourceType}: ${trimSentence(i.text)}`).join("\n");
   return `### ${title}\n${s.summary}\n\n${bullets}\n`;
 }
 
@@ -497,7 +521,7 @@ function buildMarkdownReport(
 ) {
   return [
     `# Weekly Resident Report`,
-    `**Period:** ${range.start} → ${range.end}`,
+    `**Period:** ${range.start} to ${range.end}`,
     ``,
     `## Summary`,
     c.overallSummary,

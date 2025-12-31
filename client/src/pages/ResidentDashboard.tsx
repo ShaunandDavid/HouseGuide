@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, Route, Switch } from "wouter";
-import { ArrowLeft, LayoutDashboard, User, Camera, FileText, Mic, MessageSquare } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, User, Camera, FileText, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -224,7 +224,7 @@ export default function ResidentDashboard() {
             </div>
           </div>
           <div className="border-t bg-white px-3 sm:px-6 py-2">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button
                 size="sm"
                 variant="outline"
@@ -252,14 +252,6 @@ export default function ResidentDashboard() {
                 onClick={() => setLocation(`/resident/${resident.id}/pictures`)}
               >
                 Files
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setLocation("/chat")}
-              >
-                <MessageSquare className="w-4 h-4 mr-1" />
-                Chat
               </Button>
               <Button
                 size="sm"
@@ -395,9 +387,13 @@ export default function ResidentDashboard() {
                 </section>
 
                 <section>
+                  <TrackerDashboard embedded />
+                </section>
+
+                <section>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">Files</h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <Button
                         variant={activeFilter === "all" ? "default" : "outline"}
                         size="sm"

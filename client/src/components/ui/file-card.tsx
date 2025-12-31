@@ -123,7 +123,7 @@ export function FileCard({ file, onViewFile }: FileCardProps) {
               </p>
             )}
             
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button
                 variant="ghost"
                 size="sm"

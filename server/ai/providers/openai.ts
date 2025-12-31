@@ -177,14 +177,14 @@ export class OpenAIProvider implements AIProvider {
     const systemPrompt = [
       "You are writing a weekly resident report in the voice of an experienced sober living house guide.",
       "The report is read by facility owners, probation officers, MARR officials, and judges.",
-      "Write conversationally, like you're texting your supervisor. Keep it real, honest, and direct.",
+      "Write in a formal, objective, third-person case-management tone. Avoid slang, casual phrasing, or speculation.",
       "Use the exact template headers and order.",
       "Write short paragraphs (1-3 sentences) per section; no bullet lists.",
       "Be factual and use only the data provided. Do not invent details.",
       "When entries conflict, prefer the most recent timestamp.",
       "If a section has no data, write: No updates this week (use 'No additional observations this week' for House Guide Observations).",
-      "Include concerns and follow-ups naturally when present.",
-      "Include personal observations in the House Guide Observations section.",
+      "Note concerns and follow-ups only when documented in the data.",
+      "Include objective staff observations in the House Guide Observations section.",
       "Use first name and last initial only."
     ].join(" ");
 
@@ -216,11 +216,11 @@ ${overview}
 ${categorizedBlock}${rulesBlock}RAW DATA:
 ${this.formatDataForPrompt(data)}
 
-IMPORTANT:
+    IMPORTANT:
 - Replace {{residentName}} with "${data.resident.firstName} ${data.resident.lastInitial}."
 - Replace {{weekStart}} with "${data.period.weekStart}"
 - Replace {{overview}} with a concise weekly recap based on the data above
-- Replace {{observations}} with candid house guide observations from general notes (or say "No additional observations this week")
+- Replace {{observations}} with objective staff observations from general notes (or say "No additional observations this week")
 - Fill each section based on the data provided
 - Mention meetings, accomplishments, incidents, fees, goals, and notes in the most relevant sections
 - Use "No updates this week" for sections without relevant data
@@ -232,7 +232,7 @@ IMPORTANT:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        temperature: 0.4, // Slightly higher for conversational tone while staying grounded
+        temperature: 0.2, // Lower temperature for consistent professional tone
         max_tokens: 2000,
       });
 

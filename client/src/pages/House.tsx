@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loading } from "@/components/ui/loading";
-import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText, X, MessageSquare } from "lucide-react";
+import { Home, User, ChevronRight, Settings, UserPlus, Filter, FileText, X } from "lucide-react";
 import { getHouseByName, getResidentsByHouse, getFilesByResident } from "@/lib/api";
 import { ComprehensiveReportModal } from "@/components/ComprehensiveReportModal";
 import { useToast } from "@/hooks/use-toast";
@@ -233,9 +233,9 @@ export default function House() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <h1 className="text-xl font-semibold text-gray-900 mb-2">No House Assigned</h1>
-            <p className="text-gray-600 mb-4">Contact an admin to assign you to a house, or head to chat.</p>
-            <Button onClick={() => setLocation("/chat")} className="w-full">
-              Open Chat
+            <p className="text-gray-600 mb-4">Contact an admin to assign you to a house.</p>
+            <Button onClick={handleLogout} className="w-full">
+              Sign Out
             </Button>
           </CardContent>
         </Card>
@@ -289,16 +289,6 @@ export default function House() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1"
-              onClick={() => setLocation("/chat")}
-              data-testid="chat-button"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">Chat</span>
-            </Button>
             <Button 
               variant="ghost" 
               size="sm" 
